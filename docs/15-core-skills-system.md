@@ -25,6 +25,7 @@ Current bundled core skills:
 | `skill-creator` | Meta-skill for creating new skills |
 | `workspace-organizing` | Workspace layout and file organization guidance |
 | `goclaw` | Gateway CLI/runtime administration and troubleshooting |
+| `orca-cli` | Orca desktop worktrees, terminals, agent handoffs, and browser via the `orca` CLI |
 | `lark-pm` | Lark/Feishu project-management workflows through GoClaw MCP tools |
 | `lark-playbook` | Troubleshooting playbook for failed Lark/Feishu MCP operations |
 
@@ -93,6 +94,8 @@ skills/
 ├── skill-creator/
 │   └── SKILL.md
 ├── workspace-organizing/
+│   └── SKILL.md
+├── orca-cli/
 │   └── SKILL.md
 ├── lark-pm/
 │   └── SKILL.md

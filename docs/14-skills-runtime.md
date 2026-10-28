@@ -207,6 +207,7 @@ Skills shipped with the Docker image at `/app/bundled-skills/`. Lowest priority 
 | `skill-creator` | Create new skills |
 | `workspace-organizing` | Organize shared workspaces and generated files |
 | `goclaw` | Operate and debug GoClaw gateway CLI/runtime administration |
+| `orca-cli` | Drive Orca worktrees, terminals, agent handoffs, and browser via the `orca` CLI |
 
 ### How It Works
 

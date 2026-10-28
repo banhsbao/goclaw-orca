@@ -6,6 +6,11 @@ PostgreSQL multi-tenant AI agent gateway with WebSocket RPC + HTTP API.
 
 Always respond in the same language as the user's prompt. If the user writes in Vietnamese, respond in Vietnamese. If in English, respond in English. Match the user's language naturally.
 
+## Code and PR Rules
+
+- **No code comments:** Do not add comments to code you write or modify. Do not add new comments to existing files; leave existing comments as they are unless the code they describe is removed.
+- **No Claude mentions in PRs:** Do not mention Claude, Claude Code, or Anthropic anywhere in pull requests — title, description, or comments. Do not add a "Generated with Claude Code" footer or any other AI attribution line.
+
 ## Tech Stack
 
 **Backend:** Go 1.26, Cobra CLI, gorilla/websocket, pgx/v5 (database/sql, no ORM), golang-migrate, go-rod/rod, telego (Telegram)

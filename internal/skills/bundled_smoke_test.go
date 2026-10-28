@@ -49,6 +49,7 @@ func TestBundledSkills_ExpectedCoreSkillSlugs(t *testing.T) {
 	expected := map[string]bool{
 		"docx":                 false,
 		"goclaw":               false,
+		"orca-cli":             false,
 		"pdf":                  false,
 		"pptx":                 false,
 		"skill-creator":        false,
