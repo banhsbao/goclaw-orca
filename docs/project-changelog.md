@@ -4,6 +4,20 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ---
 
+## 2026-10-28
+
+### Remote Orca CLI for sandboxed agents
+
+**Features**
+
+- Added the `orca` Secure CLI preset (`ORCA_PAIRING_CODE`, passthrough adapter) so
+  sandboxed agents can drive a paired remote Orca runtime.
+- Added the `ENABLE_ORCA_CLI` build arg to `Dockerfile` and `Dockerfile.sandbox`
+  (pinned, checksum-verified CLI bundle) and the `docker-compose.orca.yml` overlay.
+- Updated the bundled `orca-cli` skill for remote mode. See `docs/orca-remote-cli.md`.
+
+---
+
 ## 2026-07-08
 
 ### Passive memory extraction tuning

@@ -139,6 +139,23 @@ var CLIPresets = map[string]CLIPreset{
 		Tips:        "Use -A -t for plain output suitable for piping",
 		AdapterName: "psql",
 	},
+	"orca": {
+		BinaryName:  "orca",
+		Description: "Orca CLI against a remote Orca runtime (orca serve) through a paired connection",
+		EnvVars: []EnvVarDef{
+			{Name: "ORCA_PAIRING_CODE", Desc: "orca://pair?... pairing code issued by the Orca runtime for this client"},
+		},
+		DenyArgs: []string{
+			`^-`,
+			`(^|\s)--(pairing-code|environment)\b`,
+			`^(serve|open|environment|account|computer|diagnostics)\b`,
+			`^skills\s+(install|update|share)\b`,
+			`^orchestration\s+reset\b`,
+		},
+		DenyVerbose: nil,
+		Timeout:     120,
+		Tips:        "Start every session with `orca status --json`. Put the subcommand first and always pass --json. The paired runtime is fixed by the credential; do not pass --pairing-code or --environment.",
+	},
 	"rapidapi": {
 		BinaryName:  "rapidapi",
 		Description: "RapidAPI CLI",

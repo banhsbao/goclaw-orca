@@ -3,6 +3,7 @@
 # ENABLE_EMBEDUI controls whether the web UI is built and embedded.
 # Must be declared before first FROM to use in stage selector.
 ARG ENABLE_EMBEDUI=false
+ARG ENABLE_ORCA_CLI=false
 
 # ── Stage 0: Build Web UI ──
 # BuildKit skips this stage entirely when ENABLE_EMBEDUI=false
@@ -22,6 +23,28 @@ FROM web-builder AS embedui-true
 FROM busybox AS embedui-false
 RUN mkdir -p /app/dist
 FROM embedui-${ENABLE_EMBEDUI} AS web-dist
+
+FROM debian:bookworm-slim AS orca-cli-true
+ARG ORCA_CLI_VERSION=1.4.243
+ARG ORCA_CLI_SHA256=9f0a6d0d0a83eaa10b9432186472dd98e6497b4ecdd13d52739ab31cf30ce3a5
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl xz-utils \
+  && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    curl -fsSL -o /tmp/orca.deb \
+      "https://github.com/stablyai/orca/releases/download/v${ORCA_CLI_VERSION}/orca-ide_${ORCA_CLI_VERSION}_amd64.deb"; \
+    echo "${ORCA_CLI_SHA256}  /tmp/orca.deb" | sha256sum -c -; \
+    dpkg-deb --fsys-tarfile /tmp/orca.deb | tar -x -C /tmp \
+      ./opt/Orca/resources/orcad-template/out/cli/index.js \
+      ./opt/Orca/resources/orcad-template/out/package.json; \
+    mkdir -p /opt/orca-cli/bin; \
+    mv /tmp/opt/Orca/resources/orcad-template/out /opt/orca-cli/out; \
+    printf '#!/bin/sh\nexec node /opt/orca-cli/out/cli/index.js "$@"\n' > /opt/orca-cli/bin/orca; \
+    chmod 755 /opt/orca-cli/bin/orca; \
+    rm -rf /tmp/orca.deb /tmp/opt
+FROM busybox AS orca-cli-false
+RUN mkdir -p /opt/orca-cli
+FROM orca-cli-${ENABLE_ORCA_CLI} AS orca-cli
 
 # ── Stage 1: Build Go ──
 FROM golang:1.26-bookworm AS builder
@@ -77,6 +100,7 @@ ARG ENABLE_NODE=false
 ARG ENABLE_FULL_SKILLS=false
 ARG ENABLE_CLAUDE_CLI=false
 ARG ENABLE_MEDIA_PROBES=true
+ARG ENABLE_ORCA_CLI=false
 
 # Copy pinned Python deps (cleaned up after install).
 # requirements-base.txt: shared deps for ENABLE_PYTHON and ENABLE_FULL_SKILLS.
@@ -114,7 +138,7 @@ RUN set -eux; \
             pip3 install --no-cache-dir --break-system-packages \
                 -r /tmp/requirements-base.txt; \
         fi; \
-        if [ "$ENABLE_NODE" = "true" ] || [ "$ENABLE_CLAUDE_CLI" = "true" ]; then \
+        if [ "$ENABLE_NODE" = "true" ] || [ "$ENABLE_CLAUDE_CLI" = "true" ] || [ "$ENABLE_ORCA_CLI" = "true" ]; then \
             apk add --no-cache nodejs npm; \
         fi; \
     fi; \
@@ -134,6 +158,8 @@ COPY --from=builder /out/pkg-helper /app/pkg-helper
 COPY --from=builder /src/migrations/ /app/migrations/
 COPY --from=builder /src/skills/ /app/bundled-skills/
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --from=orca-cli /opt/orca-cli /opt/orca-cli
+RUN if [ -x /opt/orca-cli/bin/orca ]; then ln -s /opt/orca-cli/bin/orca /usr/local/bin/orca; fi
 
 # Fix Windows git clone issues:
 # 1. CRLF line endings in shell scripts (Windows git adds \r)

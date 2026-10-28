@@ -1,0 +1,20 @@
+# Optional overlay: let agents drive a remote Orca runtime through the `orca` CLI.
+# Installs the Orca CLI (pinned, checksum-verified) into the gateway image and turns on
+# sandbox networking so sandboxed agents can reach the Orca server.
+#
+# Prerequisites:
+#   1. On the Orca machine: orca serve --port 6768 --pairing-address <tailscale-or-lan-ip>
+#   2. Build the sandbox image with the CLI:
+#      docker build --build-arg ENABLE_ORCA_CLI=true -t goclaw-sandbox:bookworm-slim -f Dockerfile.sandbox .
+#   3. Register the `orca` Secure CLI preset and store ORCA_PAIRING_CODE as a per-user credential.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml -f docker-compose.sandbox.yml -f docker-compose.orca.yml up -d --build
+
+services:
+  goclaw:
+    build:
+      args:
+        ENABLE_ORCA_CLI: "true"
+    environment:
+      - GOCLAW_SANDBOX_NETWORK=true

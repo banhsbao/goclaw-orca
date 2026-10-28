@@ -4,7 +4,7 @@ description: Use this skill when operating the Orca desktop app/runtime through 
 license: Proprietary. Part of GoClaw bundled skills.
 metadata:
   author: GoClaw
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Orca CLI
@@ -14,15 +14,17 @@ parallel git worktrees. Its `orca` CLI ships with the desktop app and talks to t
 running Orca runtime. Use it when Orca's state (worktrees, terminals, agents, browser
 tabs) is the source of truth. Use plain shell tools when it is not.
 
-All commands below run through the GoClaw `exec` tool on the gateway host.
+All commands below run through the GoClaw `exec` tool, on the gateway host or inside the
+agent sandbox, against either the local Orca runtime or a paired remote one.
 
 ## Operating Rules
 
 1. **Resolve the binary first.** Run `command -v orca` (or `where orca` on Windows). If it
-   is missing, tell the user the Orca CLI is not installed on the gateway host (register it
-   in Orca → Settings → General → Orca CLI) and stop. Do not guess flags from memory.
+   is missing, tell the user the Orca CLI is not installed where this agent runs (register it in
+   Orca → Settings → General → Orca CLI, or build the image with `ENABLE_ORCA_CLI=true`) and stop. Do not guess flags from memory.
 2. **Check readiness.** Run `orca status --json` before anything else. If the runtime is
-   not reachable, report it; `orca open` launches the app only when the user asks.
+   not reachable, report it; `orca open` launches the app only when the user asks and only in
+   local mode.
 3. **Always pass `--json`** and parse the result. Do not scrape human-readable output.
 4. **Get the version-matched guide** when a command is not covered here or a flag is
    rejected: `orca skills get orca-cli` (full guide), `orca skills get orca-cli --references`
@@ -37,8 +39,20 @@ All commands below run through the GoClaw `exec` tool on the gateway host.
 
 ### Environment caveats
 
-- The CLI exists only where the Orca desktop app is installed. A GoClaw gateway in Docker,
-  or an agent with sandbox mode enabled, usually cannot see it — say so instead of retrying.
+- **Local mode:** the CLI exists where the Orca desktop app is installed and talks to that
+  machine's runtime.
+- **Remote mode (Docker gateway / sandboxed agent):** the image is built with
+  `ENABLE_ORCA_CLI=true` and the operator registers the `orca` Secure CLI preset with an
+  `ORCA_PAIRING_CODE` credential. Every call then targets the paired Orca server — worktrees,
+  terminals, and launched agents run on **that** machine, not inside your container. Paths
+  in results are paths on the Orca machine.
+- In remote mode the paired runtime is fixed by the credential: never pass `--pairing-code`
+  or `--environment`, and put the subcommand first (`orca status --json`, not
+  `orca --json status`). `serve`, `open`, `environment`, `account`, `computer`,
+  `diagnostics`, `skills install|update|share`, and `orchestration reset` are blocked.
+- If `orca` is missing, or `status` reports a missing credential or an unreachable runtime,
+  tell the user what to set up (CLI in the image, `orca` credential, sandbox network access
+  to the Orca server) instead of retrying.
 - `orca` is not on the exec safe-bin list, so exec approval (`on-miss`) may ask the user
   to approve the first call.
 

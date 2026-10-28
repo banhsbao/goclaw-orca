@@ -275,6 +275,7 @@ Credentials are injected automatically — do NOT attempt to provide or read cre
 | `aws` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` (opt) | `iam\s+`, `organizations\s+`, `sts\s+assume`, `ec2\s+terminate` | 60s |
 | `kubectl` | `KUBECONFIG` (file) | `delete\s+namespace`, `delete\s+node`, `drain\s+`, `cordon\s+` | 60s |
 | `terraform` | `TF_TOKEN_app_terraform_io` (opt) | `destroy`, `force-unlock` | 300s |
+| `orca` | `ORCA_PAIRING_CODE` | leading flags, `--pairing-code`, `--environment`, `serve`, `open`, `environment`, `account`, `computer`, `diagnostics`, `skills install/update/share`, `orchestration reset` | 120s |
 
 API: `POST /v1/cli-credentials {"preset": "gh", "env": {"GH_TOKEN": "ghp_xxx"}}` auto-fills all preset fields.
 
@@ -385,4 +386,5 @@ All errors include `[CREDENTIALED EXEC]` prefix for LLM pattern recognition. `Fo
 | [03-tools-system.md](./03-tools-system.md) | Credentialed CLI Tools section under Shell Exec |
 | [09-security.md](./09-security.md) | Credentialed Exec under Layer 3: Tool Security |
 | [06-store-data-model.md](./06-store-data-model.md) | Store interface pattern |
+| [orca-remote-cli.md](./orca-remote-cli.md) | Driving a remote Orca runtime from sandboxed agents |
 | [17-changelog.md](./17-changelog.md) | Feature entry |
