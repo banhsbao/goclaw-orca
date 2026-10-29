@@ -4,6 +4,17 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ---
 
+## 2026-10-29
+
+### Async Orca handoffs
+
+**Features**
+
+- `file_inbox` tool + `PUT /v1/inbox/{ticket}/{filename}`: remote coding agents started through `orca` push files into the agent workspace `inbox/` with a short-lived ticket URL; `send_file` then delivers them.
+- `orca-cli` skill no longer waits on handed-off agents in the chat turn. It replies at once and schedules a `cron` check (`deliver: true`) that reports the outcome to the same chat and removes itself.
+
+---
+
 ## 2026-10-28
 
 ### Remote Orca CLI for sandboxed agents

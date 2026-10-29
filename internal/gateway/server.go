@@ -774,6 +774,11 @@ func (s *Server) SetMediaUploadHandler(h *httpapi.MediaUploadHandler) {
 	s.handlers = append(s.handlers, h)
 }
 
+// SetInboxUploadHandler sets the ticket-authenticated inbox upload handler.
+func (s *Server) SetInboxUploadHandler(h *httpapi.InboxUploadHandler) {
+	s.handlers = append(s.handlers, h)
+}
+
 // SetMediaServeHandler sets the media serve handler.
 func (s *Server) SetMediaServeHandler(h *httpapi.MediaServeHandler) {
 	s.handlers = append(s.handlers, h)

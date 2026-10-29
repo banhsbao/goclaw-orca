@@ -33,6 +33,7 @@ func wireExtraTools(
 	globalSkillsDir string,
 	builtinSkillsDir string,
 	cronCommandEnabled bool,
+	inboxTickets *tools.InboxTicketStore,
 ) (heartbeatTool *tools.HeartbeatTool, hasMemory bool) {
 	// web_search: tenant-scoped resolve requires stores + msgBus — register here.
 	toolsReg.Register(tools.NewWebSearchTool(pgStores.ConfigSecrets, msgBus))
@@ -65,6 +66,7 @@ func wireExtraTools(
 	toolsReg.Register(tools.NewMessageTool(workspace, agentCfg.RestrictToWorkspace))
 	// Send file tool (deliver existing workspace file as attachment)
 	toolsReg.Register(tools.NewSendFileTool(workspace, agentCfg.RestrictToWorkspace))
+	toolsReg.Register(tools.NewFileInboxTool(workspace, inboxTickets))
 	// Group members tool (list members in group chats)
 	toolsReg.Register(tools.NewListGroupMembersTool())
 	// Zalo group list tool (resolve a group's real chat ID from its display name)

@@ -21,6 +21,7 @@ import (
 
 // httpHandlers bundles the results of wireHTTP() for passing to wireHTTPHandlersOnServer.
 type httpHandlers struct {
+	inboxTickets     *tools.InboxTicketStore
 	agents           *httpapi.AgentsHandler
 	skills           *httpapi.SkillsHandler
 	traces           *httpapi.TracesHandler
@@ -322,6 +323,8 @@ func (d *gatewayDeps) wireHTTPHandlersOnServer(
 
 	// Media upload endpoint — accepts multipart file uploads, returns temp path + MIME type.
 	d.server.SetMediaUploadHandler(httpapi.NewMediaUploadHandler())
+
+	d.server.SetInboxUploadHandler(httpapi.NewInboxUploadHandler(d.inboxTickets))
 
 	// Media serve endpoint — serves persisted media files by ID for WS/web clients.
 	if mediaStore != nil {

@@ -71,3 +71,16 @@ machine's desktop: leading flags (put the subcommand first), `--pairing-code`,
 Ask the agent to run `orca status --json`. `runtime.state` should be `ready` and
 `target.environment` should be `pairing-code`. The bundled `orca-cli` skill covers the
 remaining commands.
+
+## 5. Getting files back
+
+Files created on the Orca machine do not reach GoClaw on their own. The `file_inbox` tool
+issues a short-lived upload URL (30 min, 10 files, 50 MB each, in-memory, bound to the
+calling agent's workspace `inbox/` folder). The coding agent uploads with
+`curl -fsS -T <file> <url>`, and the GoClaw agent delivers the result with `send_file`.
+
+- The Orca machine must reach the gateway. Set `gateway.public_url` (or reach the gateway
+  once through its public address) so the URL is known.
+- The URL is the only credential: no gateway token is placed on the Orca machine.
+- Tickets live in process memory; a gateway restart or a second gateway instance invalidates them.
+- Executable extensions (`.sh`, `.exe`, ...) and dotfiles are rejected.

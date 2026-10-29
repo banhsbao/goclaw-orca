@@ -4,7 +4,7 @@ description: Use this skill when operating the Orca desktop app/runtime through 
 license: Proprietary. Part of GoClaw bundled skills.
 metadata:
   author: GoClaw
-  version: "1.1.0"
+  version: "1.3.0"
 ---
 
 # Orca CLI
@@ -130,8 +130,51 @@ orca agent launch --agent codex --worktree id:<repoId>::<path> --prompt "<task b
   to finish, and do not create orchestration tasks for a plain handoff.
 - If the launch reply is lost, re-run the exact command with `--retry-launch <operationId>`.
   Never retry as a fresh launch — that starts a second agent.
+- **Never block the chat turn on the other agent.** After a handoff, do not run
+  `terminal wait`, repeated `terminal read`, or any polling loop in the same turn. Reply to
+  the user right away with the worktree id, agent handle, and that you will report back,
+  then schedule a status check (see Async Handoff Follow-up).
+- To get files the other agent creates, call `file_inbox` before the handoff and put the
+  returned `curl -fsS -T <local-file> <url>` command in the brief ("when done, upload each
+  deliverable with this command"). Files land in the workspace `inbox/` folder; deliver them
+  with `send_file`. Treat the URL as a secret and never echo it to the user.
 - Write the brief so it stands alone: goal, repo/branch context, constraints, and what
   "done" means. The receiving agent cannot see this GoClaw conversation.
+
+## Async Handoff Follow-up
+
+Handoffs run for minutes to hours. Keep the user free to keep chatting and report back
+through a `cron` job instead of waiting.
+
+1. Finish the handoff and reply to the user (worktree id, agent handle, what was asked).
+2. Create one recurring check with the `cron` tool (call `datetime` first, never guess times):
+
+```json
+{
+  "action": "add",
+  "job": {
+    "name": "orca-check-<task-slug>",
+    "schedule": { "kind": "every", "everyMs": 180000 },
+    "deliver": true,
+    "message": "Check Orca handoff. Worktree: id:<repoId>::<path>. Terminal: <handle>. Task: <one line>. Cron jobId: <jobId>. Run `orca worktree show --worktree <id> --json` and `orca terminal read --terminal <handle> --screen --json`. If the agent is still working, reply with exactly NO_REPLY (the gateway then sends nothing to the user). If it finished (idle at a prompt with a final result, process exited, or workspace-status completed), summarize the outcome for the user, then remove this cron job. If it is blocked on a permission menu or an error, say so and remove this cron job. If the handle is stale, re-list terminals once; if still missing, report and remove the job."
+  }
+}
+```
+
+- The job runs as an isolated turn with no chat history: put worktree id, handle, task, and
+  completion rules in `message`. Use `deliver: true` so the result returns to this chat.
+- The check turn must be read-only and short: one `worktree show` plus one `terminal read
+  --screen`. Never `terminal wait` with a long timeout inside it.
+- Prefer 3–5 minute intervals. Do not poll faster than 60 seconds.
+- Remove the job on every terminal outcome (done, blocked, failed, stale). Cap it: if the
+  agent is still running after ~2 hours, report that and remove the job unless the user
+  wants to keep watching.
+- Use the `command` payload only for gateway-local probes. `orca` runs in the sandbox with a
+  per-user credential, so the check must be an agent turn.
+- Ask the agent you launch to set `orca worktree set --worktree <id> --workspace-status
+  completed` when done, and read `workspace-status` first in the check as the clearest signal.
+- When the user asks "is it done?" in chat, answer with one `worktree show` and one
+  `terminal read --screen`, not a wait.
 
 ## Terminals
 

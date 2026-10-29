@@ -109,6 +109,7 @@ func builtinToolSeedData() []store.BuiltinToolDef {
 		// messaging
 		{Name: "message", DisplayName: "Message", Description: "Send a proactive message to a user on a connected channel (Telegram, Discord, etc.)", Category: "messaging", Enabled: true},
 		{Name: "send_file", DisplayName: "Send File", Description: "Send an existing workspace file as an attachment in the current chat (does not create or modify the file)", Category: "messaging", Enabled: true},
+		{Name: "file_inbox", DisplayName: "File Inbox", Description: "Issue a short-lived upload URL so a remote machine or coding agent can push files into the workspace inbox", Category: "messaging", Enabled: true},
 		{Name: "create_forum_topic", DisplayName: "Create Telegram Forum Topic", Description: "Create a Telegram forum topic and return its message_thread_id for routing", Category: "messaging", Enabled: true},
 		{Name: "list_group_members", DisplayName: "List Group Members", Description: "List the members of the current group chat", Category: "messaging", Enabled: true},
 		{Name: "zalo_list_groups", DisplayName: "Zalo List Groups", Description: "Resolve a Zalo group's real chat ID from its display name", Category: "messaging", Enabled: true},

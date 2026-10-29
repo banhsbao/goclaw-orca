@@ -516,7 +516,8 @@ func runGateway() {
 	_ = skillSearchTool // used via wireExtras → skillsLoader; kept for type clarity
 
 	// Register cron/heartbeat/session/message tools, aliases, allow-paths, store wiring.
-	heartbeatTool, hasMemory := wireExtraTools(pgStores, toolsReg, msgBus, workspace, dataDir, agentCfg, globalSkillsDir, builtinSkillsDir, cfg.Cron.CommandEnabled)
+	inboxTickets := tools.NewInboxTicketStore()
+	heartbeatTool, hasMemory := wireExtraTools(pgStores, toolsReg, msgBus, workspace, dataDir, agentCfg, globalSkillsDir, builtinSkillsDir, cfg.Cron.CommandEnabled, inboxTickets)
 
 	// Register workstation_exec + claude_remote tools (Standard edition only; deny-all until Phase 6).
 	// cleanupWorkstation stops the activity sink retention goroutine and drains the write buffer.
@@ -533,6 +534,12 @@ func runGateway() {
 	// Create gateway server and wire enforcement
 	server := gateway.NewServer(cfg, msgBus, agentRouter, pgStores.Sessions, toolsReg)
 	server.SetVersion(Version)
+	inboxTickets.SetBaseURL(func() string {
+		if u := cfg.Gateway.PublicURL; u != "" {
+			return u
+		}
+		return server.PublicURLSnapshot().Get()
+	})
 	server.SetDB(pgStores.DB)
 	server.SetPolicyEngine(permPE)
 	server.SetToolPolicy(toolPE)
@@ -640,6 +647,7 @@ func runGateway() {
 		channelMemorySvc: channelMemorySvc,
 		workspace:        workspace,
 		dataDir:          dataDir,
+		inboxTickets:     inboxTickets,
 		domainBus:        domainBus,
 		usageCapSvc:      usageCapSvc,
 		audioMgr:         audioMgr,

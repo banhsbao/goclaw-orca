@@ -183,6 +183,7 @@ func (cfg SystemPromptConfig) sectionContent(id string, defaultFn func() []strin
 var coreToolSummaries = map[string]string{
 	"read_file":              "Read file contents — only accesses your agent workspace. For docs returned by vault_search (shared/personal/team vault), use vault_read instead",
 	"write_file":             "Create or overwrite files (set deliver=true to also send as chat attachment)",
+	"file_inbox":             "Create a short-lived upload URL (curl PUT) so a remote machine or coding agent can push files into this workspace inbox/ folder; deliver them afterwards with send_file",
 	"send_file":              "Send an EXISTING workspace file as a chat attachment — use to resend/share files; does NOT create or modify the file (use write_file for that)",
 	"list_files":             "List directory contents",
 	"exec":                   "Run shell commands",
