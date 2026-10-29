@@ -38,6 +38,7 @@ type gatewayDeps struct {
 	enrichWorker     *vault.EnrichWorker    // nil if enrichment worker not registered; for stop/enqueue
 	workspace        string
 	dataDir          string
+	inboxTickets     *tools.InboxTicketStore
 	domainBus        eventbus.DomainEventBus
 	usageCapSvc      *usagecaps.Service
 	audioMgr         *audio.Manager      // nil if TTS not configured; used by TTSHandler

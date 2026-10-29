@@ -21,7 +21,6 @@ import (
 
 // httpHandlers bundles the results of wireHTTP() for passing to wireHTTPHandlersOnServer.
 type httpHandlers struct {
-	inboxTickets     *tools.InboxTicketStore
 	agents           *httpapi.AgentsHandler
 	skills           *httpapi.SkillsHandler
 	traces           *httpapi.TracesHandler
