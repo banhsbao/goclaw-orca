@@ -140,6 +140,20 @@ orca agent launch --agent codex --worktree id:<repoId>::<path> --prompt "<task b
   with `send_file`. Treat the URL as a secret and never echo it to the user.
 - Write the brief so it stands alone: goal, repo/branch context, constraints, and what
   "done" means. The receiving agent cannot see this GoClaw conversation.
+- **One owner per agent session.** Send follow-up instructions only to an agent whose handle
+  came from your own `worktree create --agent` or `agent launch`. An agent started by a
+  teammate belongs to that teammate: hand the work to them through `team_tasks` instead of
+  typing into their terminal.
+- Send a follow-up brief to your own running agent with proof of submission:
+
+```bash
+orca terminal send --terminal <handle> --text "<follow-up brief>" --enter --wait-submit 30 --json
+```
+
+- In a chat turn the no-blocking rule above applies. In a team task run you must collect
+  evidence before completing the task, so wait once with
+  `orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 600000 --json`, then
+  read once with `--screen`. Never poll with repeated `terminal read`.
 
 ## Async Handoff Follow-up
 
@@ -198,6 +212,24 @@ orca terminal close --terminal <handle> --json
   report it to the user rather than answering the menu yourself.
 - If a handle is stale (`terminal_handle_stale`, after an Orca restart), re-list and use the
   new handle only.
+
+### Delegate work, do not drive a shell
+
+Typing commands into a plain shell terminal costs two model turns per command (send, then
+read) and keeps the whole job outside any coding agent's review.
+
+- Use a plain shell terminal only for one or two quick checks, such as `git status` or
+  `curl -sI <url>`.
+- Multi-step work goes to a coding agent through `worktree create --agent` or
+  `agent launch`: editing files, building, deploying, calling external APIs, and anything
+  that touches credentials. You verify the result afterwards.
+- For a single command, run it as its own terminal and collect the result in one `exec`:
+
+```bash
+orca terminal create --worktree <selector> --title check --command "<cmd>" --json
+orca terminal wait --terminal <handle> --for exit --timeout-ms 60000 --json
+orca terminal read --terminal <handle> --json
+```
 
 ## References, Search, Automations
 
