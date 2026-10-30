@@ -84,7 +84,6 @@ func resolveTeamTaskOutcome(
 			currentTask.Status == store.TeamTaskStatusCancelled)
 
 	if alreadyTerminal {
-		commentMemberRequestOutcomeOnParent(ctx, deps.TeamStore, meta.TaskID, meta.ToAgent)
 		// Always dispatch unblocked tasks even if already terminal.
 		if deps.PostTurn != nil {
 			deps.PostTurn.DispatchUnblockedTasks(ctx, meta.TeamID)
@@ -221,8 +220,6 @@ func resolveTeamTaskOutcome(
 			))
 		}
 	}
-
-	commentMemberRequestOutcomeOnParent(ctx, deps.TeamStore, meta.TaskID, toAgent)
 
 	// Always dispatch unblocked tasks after member turn ends,
 	// regardless of whether the task was already completed by the tool.

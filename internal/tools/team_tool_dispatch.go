@@ -360,7 +360,7 @@ func (m *TeamToolManager) DispatchUnblockedTasks(ctx context.Context, teamID uui
 	dispatched := make(map[uuid.UUID]bool)
 	for i := range tasks {
 		task := &tasks[i]
-		if task.Status != store.TeamTaskStatusPending || task.OwnerAgentID == nil || TaskAwaitingLeaderApproval(task) {
+		if task.Status != store.TeamTaskStatusPending || task.OwnerAgentID == nil {
 			continue
 		}
 		ownerID := *task.OwnerAgentID

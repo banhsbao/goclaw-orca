@@ -10,7 +10,6 @@ import (
 
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
-	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
 // memberTaskInfo holds cached task metadata for mid-loop progress nudges.
@@ -31,14 +30,8 @@ func (l *Loop) injectTeamTaskReminders(ctx context.Context, req *RunRequest, mes
 		if team, _ := l.teamStore.GetTeamForAgent(ctx, l.agentUUID); team != nil && team.LeadAgentID == l.agentUUID {
 			if tasks, err := l.teamStore.ListTasks(ctx, team.ID, "newest", "active", req.UserID, "", "", 0, 0); err == nil {
 				var stale []string
-				var awaitingApproval []string
 				var inProgress []string
 				for _, t := range tasks {
-					if t.Status == store.TeamTaskStatusPending && tools.TaskAwaitingLeaderApproval(&t) {
-						age := time.Since(t.CreatedAt).Truncate(time.Minute)
-						awaitingApproval = append(awaitingApproval, fmt.Sprintf("- %s: \"%s\" (waiting %s)", t.ID, t.Subject, age))
-						continue
-					}
 					if t.Status == store.TeamTaskStatusPending {
 						age := time.Since(t.CreatedAt).Truncate(time.Minute)
 						stale = append(stale, fmt.Sprintf("- %s: \"%s\" (pending %s)", t.ID, t.Subject, age))
@@ -62,13 +55,6 @@ func (l *Loop) injectTeamTaskReminders(ctx context.Context, req *RunRequest, mes
 						"You have %d pending team task(s) awaiting dispatch:\n%s\n"+
 							"These tasks will be auto-dispatched to available team members. If no longer needed, cancel with team_tasks action=cancel.",
 						len(stale), strings.Join(stale, "\n")))
-				}
-				if len(awaitingApproval) > 0 {
-					parts = append(parts, fmt.Sprintf(
-						"You have %d member request(s) waiting for your approval:\n%s\n"+
-							"They are NOT dispatched until you act. Approve with team_tasks(action=\"approve\", task_id=\"<task_id>\") "+
-							"or drop with team_tasks(action=\"cancel\", task_id=\"<task_id>\", text=\"reason\").",
-						len(awaitingApproval), strings.Join(awaitingApproval, "\n")))
 				}
 				if len(inProgress) > 0 {
 					parts = append(parts, fmt.Sprintf(

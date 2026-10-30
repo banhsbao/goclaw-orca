@@ -64,6 +64,4 @@ const (
 	TaskMetaOriginTrace    = "origin_trace_id"
 	TaskMetaOriginRootSpan = "origin_root_span_id"
 	TaskMetaTeamWorkspace  = "team_workspace"
-
-	TaskMetaAwaitingLeaderApproval = "awaiting_leader_approval"
 )

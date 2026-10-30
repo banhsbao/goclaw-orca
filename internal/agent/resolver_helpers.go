@@ -134,12 +134,8 @@ func buildTeamMD(team *store.TeamData, members []store.TeamMemberData, selfID uu
 		memberCfg := tools.ParseMemberRequestConfig(team.Settings)
 		if memberCfg.Enabled {
 			sb.WriteString("\n## Requesting Help\n\n")
-			sb.WriteString("Need something from another teammate (a file, a fix, an answer)? Create a request:\n")
-			sb.WriteString("```\nteam_tasks(action=\"create\", task_type=\"request\", subject=\"...\", description=\"...\", assignee=\"agent-key\")\n```\n")
-			if !memberCfg.AutoDispatch {
-				sb.WriteString("The team lead approves the request before it is dispatched.\n")
-			}
-			sb.WriteString("Its result is posted as a comment on your current task. Finish what you can now and say in your result what you are waiting for.\n")
+			sb.WriteString("Need help from another teammate? Create a request:\n")
+			sb.WriteString("```\nteam_tasks(action=\"create\", task_type=\"request\", subject=\"...\", assignee=\"agent-key\")\n```\n")
 		} else {
 			sb.WriteString("\n## Communication\n\n")
 			sb.WriteString("Use `team_tasks(action=\"comment\")` to report issues or ask questions on your current task.\n")
