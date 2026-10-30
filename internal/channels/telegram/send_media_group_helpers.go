@@ -1,11 +1,17 @@
 package telegram
 
 import (
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"log/slog"
 	"mime"
 	"os"
 	"path/filepath"
 	"strings"
+
+	_ "golang.org/x/image/webp"
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 )
@@ -13,6 +19,9 @@ import (
 const (
 	telegramMediaGroupMinItems = 2
 	telegramMediaGroupMaxItems = 10
+
+	telegramPhotoMaxSideSum     = 10000
+	telegramPhotoMaxAspectRatio = 20
 )
 
 type telegramMediaKind string
@@ -71,7 +80,30 @@ func (c *Channel) prepareTelegramMediaItems(msg bus.OutboundMessage) ([]telegram
 			asVoice:      asVoice,
 		})
 	}
+	if content != "" && len(items) > 0 {
+		last := &items[len(items)-1]
+		text := markdownToTelegramHTML(content)
+		if last.followUpText != "" {
+			last.followUpText += "\n\n" + text
+		} else {
+			last.followUpText = text
+		}
+	}
 	return items, nil
+}
+
+func telegramPhotoDimensionsAccepted(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return true
+	}
+	defer file.Close()
+	cfg, _, err := image.DecodeConfig(file)
+	if err != nil || cfg.Width <= 0 || cfg.Height <= 0 {
+		return true
+	}
+	long, short := max(cfg.Width, cfg.Height), min(cfg.Width, cfg.Height)
+	return cfg.Width+cfg.Height <= telegramPhotoMaxSideSum && long <= short*telegramPhotoMaxAspectRatio
 }
 
 func classifyTelegramOutboundMedia(media bus.MediaAttachment, metadata map[string]string) (telegramMediaKind, bool, bool) {
@@ -84,6 +116,10 @@ func classifyTelegramOutboundMedia(media bus.MediaAttachment, metadata map[strin
 	case strings.HasPrefix(ct, "image/"):
 		if info, statErr := os.Stat(media.URL); statErr == nil && info.Size() > photoSizeThreshold {
 			slog.Info("large image, sending as document to preserve quality", "path", media.URL, "size", info.Size())
+			return telegramMediaDocument, true, false
+		}
+		if !telegramPhotoDimensionsAccepted(media.URL) {
+			slog.Info("image dimensions exceed Telegram photo limits, sending as document", "path", media.URL)
 			return telegramMediaDocument, true, false
 		}
 		return telegramMediaPhoto, true, false

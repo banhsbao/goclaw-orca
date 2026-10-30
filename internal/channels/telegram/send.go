@@ -369,12 +369,15 @@ func (c *Channel) sendMediaMessage(ctx context.Context, chatID int64, msg bus.Ou
 		return err
 	}
 
+	sent := 0
 	for _, chunk := range chunkTelegramMediaItems(items) {
 		if chunk.grouped {
 			if err := c.sendTelegramMediaGroup(ctx, chatIDObj, chunk.items, replyTo, threadID); err != nil {
+				c.sendTextOfUnsentMedia(ctx, chatID, items[sent:], threadID)
 				return err
 			}
 			replyTo = 0
+			sent += len(chunk.items)
 			for _, item := range chunk.items {
 				if err := c.sendTelegramMediaFollowUp(ctx, chatID, item.followUpText, threadID); err != nil {
 					return err
@@ -385,15 +388,28 @@ func (c *Channel) sendMediaMessage(ctx context.Context, chatID int64, msg bus.Ou
 
 		for _, item := range chunk.items {
 			if err := c.sendSingleTelegramMediaItem(ctx, chatIDObj, item, replyTo, threadID); err != nil {
+				c.sendTextOfUnsentMedia(ctx, chatID, items[sent:], threadID)
 				return err
 			}
 			replyTo = 0
+			sent++
 			if err := c.sendTelegramMediaFollowUp(ctx, chatID, item.followUpText, threadID); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func (c *Channel) sendTextOfUnsentMedia(ctx context.Context, chatID int64, items []telegramMediaSendItem, threadID int) {
+	for _, item := range items {
+		for _, text := range []string{item.caption, item.followUpText} {
+			if err := c.sendTelegramMediaFollowUp(ctx, chatID, text, threadID); err != nil {
+				slog.Warn("telegram: failed to send text of unsent media", "chat_id", chatID, "error", err)
+				return
+			}
+		}
+	}
 }
 
 func (c *Channel) validateOutboundMediaSize(path string) error {

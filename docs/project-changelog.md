@@ -6,6 +6,14 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ## 2026-10-30
 
+### Telegram media delivery fixes
+
+**Fixes**
+
+- Images that break Telegram photo limits (width + height above 10000, or aspect ratio above 20, such as full-page mobile screenshots) are sent as documents instead of photos. Before, Telegram rejected the whole album with `PHOTO_INVALID_DIMENSIONS`.
+- The agent reply is no longer dropped when every attachment carries its own caption. It is sent as a follow-up message after the media.
+- When a media send still fails, the captions and reply text of the unsent media are delivered as plain messages before the error is reported, so the user never loses the answer.
+
 ### Orca file hand-off fixes
 
 **Fixes**
