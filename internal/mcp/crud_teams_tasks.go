@@ -10,7 +10,6 @@ import (
 	mcpserver "github.com/mark3labs/mcp-go/server"
 
 	"github.com/nextlevelbuilder/goclaw/internal/store"
-	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
 // maxTaskCommentLength mirrors internal/gateway/methods/teams_tasks_mutations.go's
@@ -358,13 +357,6 @@ func handleTeamsTasksApprove(teams store.TeamStore) mcpserver.ToolHandlerFunc {
 		comment := req.GetString("comment", "")
 		if len(comment) > maxTaskCommentLength {
 			return mcpgo.NewToolResultError("teams.tasks.approve: comment too long"), nil
-		}
-		task, err := getTaskInTeam(ctx, teams, teamID, taskID)
-		if err != nil {
-			return toolError("teams.tasks.approve", err)
-		}
-		if task.Status == store.TeamTaskStatusPending && tools.TaskAwaitingLeaderApproval(task) {
-			return mcpgo.NewToolResultError("teams.tasks.approve: this is a member request waiting for leader approval; approve it from the dashboard or ask the team lead to approve it"), nil
 		}
 		if err := teams.ApproveTask(ctx, taskID, teamID, comment); err != nil {
 			return toolError("teams.tasks.approve", err)

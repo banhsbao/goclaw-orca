@@ -32,13 +32,12 @@ interface BoardContainerProps {
   addTaskComment?: (teamId: string, taskId: string, content: string) => Promise<void>;
   cancelTask?: (teamId: string, taskId: string, reason?: string) => Promise<void>;
   retryTask?: (teamId: string, taskId: string, comment: string, agentId?: string) => Promise<void>;
-  approveTask?: (teamId: string, taskId: string, comment?: string) => Promise<void>;
   onWorkspace?: () => void;
 }
 
 export const BoardContainer = memo(function BoardContainer({
   teamId, members, scopes, isTeamV2,
-  getTeamTasks, getTaskDetail, getTaskLight, deleteTask, deleteTasksBulk, addTaskComment, cancelTask, retryTask, approveTask, onWorkspace,
+  getTeamTasks, getTaskDetail, getTaskLight, deleteTask, deleteTasksBulk, addTaskComment, cancelTask, retryTask, onWorkspace,
 }: BoardContainerProps) {
   const { t } = useTranslation("teams");
   const viewMode = useBoardStore((s) => s.viewMode);
@@ -144,7 +143,6 @@ export const BoardContainer = memo(function BoardContainer({
             addTaskComment={addTaskComment}
             cancelTask={cancelTask}
             retryTask={retryTask}
-            approveTask={approveTask}
           />
         )}
       </div>
@@ -171,7 +169,6 @@ export const BoardContainer = memo(function BoardContainer({
             deleteTask={deleteTask}
             cancelTask={cancelTask}
             retryTask={retryTask}
-            approveTask={approveTask}
             assignees={assigneeOptions}
             taskLookup={taskLookup}
             memberLookup={memberLookup}

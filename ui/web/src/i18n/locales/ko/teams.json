@@ -128,8 +128,7 @@
     "deleteBulkTitle": "태스크 삭제",
     "deleteBulkConfirm": "{{count}}개 태스크가 영구적으로 삭제됩니다. 확인하려면 \"delete\"를 입력하세요.",
     "badges": {
-      "awaitingReply": "응답 대기 중",
-      "awaitingApproval": "승인 대기"
+      "awaitingReply": "응답 대기 중"
     },
     "cancel": "작업 취소",
     "cancelTitle": "이 작업을 취소할까요?",
@@ -140,8 +139,7 @@
     "retryDescription": "작업이 담당자에게 새 실행으로 다시 전달됩니다. 댓글은 작업에 기록되고 배정 내용에 포함됩니다. 답변이나 누락된 지시를 여기에 적으세요.",
     "retryCommentPlaceholder": "담당자가 무엇을 다르게 해야 하나요, 또는 어떤 답변을 기다리고 있었나요?",
     "retryCommentRequired": "재시도하려면 댓글이 필요합니다.",
-    "retryAssignee": "담당자",
-    "approveRequest": "요청 승인"
+    "retryAssignee": "담당자"
   },
   "delegations": {
     "noTitle": "위임 없음",

@@ -128,8 +128,7 @@
     "deleteBulkTitle": "Delete tasks",
     "deleteBulkConfirm": "This will permanently delete {{count}} task(s). Type \"delete\" to confirm.",
     "badges": {
-      "awaitingReply": "awaiting reply",
-      "awaitingApproval": "awaiting approval"
+      "awaitingReply": "awaiting reply"
     },
     "cancel": "Cancel task",
     "cancelTitle": "Cancel this task?",
@@ -140,8 +139,7 @@
     "retryDescription": "The task goes back to its assignee as a new run. Your comment is posted on the task and included in the assignment — this is where the answer or missing instruction goes.",
     "retryCommentPlaceholder": "What should the assignee do differently, or what was the answer they were waiting for?",
     "retryCommentRequired": "A comment is required to retry.",
-    "retryAssignee": "Assignee",
-    "approveRequest": "Approve request"
+    "retryAssignee": "Assignee"
   },
   "delegations": {
     "noTitle": "No delegations",
