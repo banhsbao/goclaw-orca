@@ -209,6 +209,10 @@ func (t *TeamTasksTool) executeApprove(ctx context.Context, args map[string]any)
 		return ErrorResult("task does not belong to your team")
 	}
 
+	if task.Status == store.TeamTaskStatusPending && TaskAwaitingLeaderApproval(task) {
+		return t.approveMemberRequest(ctx, team, agentID, task)
+	}
+
 	// Atomic transition: in_review -> completed
 	if err := t.manager.Store().ApproveTask(ctx, taskID, team.ID, ""); err != nil {
 		return ErrorResult("failed to approve task: " + err.Error())

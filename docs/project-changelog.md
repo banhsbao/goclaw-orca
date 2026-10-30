@@ -6,6 +6,16 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ## 2026-10-30
 
+### Team member requests wait for leader approval
+
+**Fixes**
+
+- With `settings.member_requests = {"enabled": true, "auto_dispatch": false}`, a request a member creates (`team_tasks` `create` with `task_type: "request"`) is now held until the team lead approves it. Before, `auto_dispatch: false` only skipped the dispatch at creation time, and `DispatchUnblockedTasks` sent the request out as soon as the member's turn ended. Held requests carry `metadata.awaiting_leader_approval`.
+- The lead approves a held request with `team_tasks(action="approve", task_id=...)`, which dispatches it at once, or drops it with `cancel`. The lead's turn reminder lists held requests separately from pending tasks.
+- When a request finishes (completed, failed or cancelled), its result is posted as a comment on the member task that raised it, so the requester sees the answer when it is retried.
+
+**Known gap:** the dashboard approve button (`teams.tasks.approve`) still only approves `in_review` tasks. Held requests are approved by the lead agent, not from the web UI.
+
 ### Telegram media delivery fixes
 
 **Fixes**

@@ -150,6 +150,9 @@ func (t *TeamTasksTool) executeCreate(ctx context.Context, args map[string]any) 
 		UserChatLayer(chatID, shared),
 	)
 	taskMeta[TaskMetaTeamWorkspace] = teamWsDir
+	if skipAutoDispatch {
+		taskMeta[TaskMetaAwaitingLeaderApproval] = true
+	}
 	// Auto-collect media files from current run to team workspace.
 	// When leader received files from user and creates a task, copy those
 	// files to the team workspace so members can access them via read_file.
@@ -326,6 +329,9 @@ func (t *TeamTasksTool) executeCreate(ctx context.Context, args map[string]any) 
 		assigneeName = t.manager.AgentKeyFromID(ctx, assigneeID)
 	}
 	msg := fmt.Sprintf("Task created: %s (id=%s, task_number=%d, status=%s, assignee=%s)", subject, task.ID, task.TaskNumber, status, assigneeName)
+	if skipAutoDispatch {
+		msg += "\nThis request waits for the team lead to approve it before it is dispatched. Its result will be posted as a comment on your current task."
+	}
 
 	// Soft guardrail: warn if subject suggests multiple deliverables.
 	// Only checks subject (not description) — detailed descriptions are fine.

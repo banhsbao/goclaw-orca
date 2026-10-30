@@ -116,6 +116,9 @@ func (t *TeamTasksTool) executeRetry(ctx context.Context, args map[string]any) *
 		return ErrorResult("cannot retry task assigned to the team lead — reassign to a team member first via update")
 	}
 
+	if err := t.clearLeaderApprovalFlag(ctx, task); err != nil {
+		return ErrorResult("failed to reset task: " + err.Error())
+	}
 	// Reset status to pending first (AssignTask only transitions from pending).
 	if err := t.manager.Store().ResetTaskStatus(ctx, taskID, team.ID); err != nil {
 		return ErrorResult("failed to reset task: " + err.Error())

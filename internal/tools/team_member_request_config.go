@@ -1,6 +1,20 @@
 package tools
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/nextlevelbuilder/goclaw/internal/store"
+)
+
+// TaskAwaitingLeaderApproval reports whether a member request is held until the
+// team lead approves it. DispatchUnblockedTasks skips such tasks.
+func TaskAwaitingLeaderApproval(task *store.TeamTaskData) bool {
+	if task == nil || task.Metadata == nil {
+		return false
+	}
+	awaiting, _ := task.Metadata[TaskMetaAwaitingLeaderApproval].(bool)
+	return awaiting
+}
 
 // MemberRequestConfig controls whether team members can create "request" tasks.
 type MemberRequestConfig struct {
