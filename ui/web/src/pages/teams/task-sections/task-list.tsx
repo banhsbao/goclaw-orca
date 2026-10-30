@@ -9,7 +9,7 @@ import { Pagination } from "@/components/shared/pagination";
 import { usePagination } from "@/hooks/use-pagination";
 import type { TeamTaskData, TeamTaskComment, TeamTaskEvent, TeamTaskAttachment } from "@/types/team";
 import type { TeamMemberData } from "@/types/team";
-import { taskStatusBadgeVariant, isTerminalStatus } from "./task-utils";
+import { taskStatusBadgeVariant, isTerminalStatus, isAwaitingLeaderApproval } from "./task-utils";
 import { buildTaskLookup, buildMemberLookup, buildAssigneeOptions } from "../board/board-utils";
 
 const TaskDetailDialog = lazy(() =>
@@ -32,11 +32,12 @@ interface TaskListProps {
   addTaskComment?: (teamId: string, taskId: string, content: string) => Promise<void>;
   cancelTask?: (teamId: string, taskId: string, reason?: string) => Promise<void>;
   retryTask?: (teamId: string, taskId: string, comment: string, agentId?: string) => Promise<void>;
+  approveTask?: (teamId: string, taskId: string, comment?: string) => Promise<void>;
 }
 
 export function TaskList({
   tasks, loading, teamId, members, isTeamV2, emojiLookup,
-  getTaskDetail, deleteTask, deleteTasksBulk, addTaskComment, cancelTask, retryTask,
+  getTaskDetail, deleteTask, deleteTasksBulk, addTaskComment, cancelTask, retryTask, approveTask,
 }: TaskListProps) {
   const { t } = useTranslation("teams");
   const [selectedTask, setSelectedTask] = useState<TeamTaskData | null>(null);
@@ -236,6 +237,11 @@ export function TaskList({
               </div>
               <div className="flex flex-wrap items-center gap-1">
                 <Badge variant={taskStatusBadgeVariant(task.status)}>{task.status.replace(/_/g, " ")}</Badge>
+                {isAwaitingLeaderApproval(task) && (
+                  <Badge variant="outline" className="border-sky-500/50 bg-sky-500/10 text-2xs text-sky-700 dark:text-sky-400">
+                    {t("tasks.badges.awaitingApproval")}
+                  </Badge>
+                )}
                 {isTeamV2 && task.followup_at && task.status === "in_progress" && (
                   <Badge variant="outline" className="border-amber-500/50 bg-amber-500/10 text-2xs text-amber-700 dark:text-amber-400">
                     {t("tasks.badges.awaitingReply")}
@@ -282,6 +288,7 @@ export function TaskList({
             deleteTask={deleteTask}
             cancelTask={cancelTask}
             retryTask={retryTask}
+            approveTask={approveTask}
             assignees={assigneeOptions}
             onAddComment={addTaskComment}
             taskLookup={taskLookup}

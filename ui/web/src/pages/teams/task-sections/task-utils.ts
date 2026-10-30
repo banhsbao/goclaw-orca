@@ -29,6 +29,14 @@ export function canCancelTask(status: string) {
   return status !== "completed" && status !== "cancelled";
 }
 
+/**
+ * Whether the task is a member request held for leader approval
+ * (teams.tasks.approve releases and dispatches it).
+ */
+export function isAwaitingLeaderApproval(task: { status: string; metadata?: Record<string, unknown> }) {
+  return task.status === "pending" && task.metadata?.awaiting_leader_approval === true;
+}
+
 const RETRYABLE_STATUSES = new Set(["stale", "failed", "cancelled", "in_review", "blocked"]);
 
 /**

@@ -14,7 +14,7 @@ Significant changes, features, and fixes in reverse chronological order.
 - The lead approves a held request with `team_tasks(action="approve", task_id=...)`, which dispatches it at once, or drops it with `cancel`. The lead's turn reminder lists held requests separately from pending tasks.
 - When a request finishes (completed, failed or cancelled), its result is posted as a comment on the member task that raised it, so the requester sees the answer when it is retried.
 
-**Known gap:** the dashboard approve button (`teams.tasks.approve`) still only approves `in_review` tasks. Held requests are approved by the lead agent, not from the web UI.
+- Dashboard: held requests show an "awaiting approval" badge on the task board and in the task dialog, and the dialog has an "Approve request" button. `teams.tasks.approve` releases a held request (clears the flag, assigns it to its owner and dispatches it) and keeps the old `in_review` approval for every other task. The MCP `teams.tasks.approve` tool cannot dispatch, so it refuses held requests with a pointer to the dashboard or the team lead.
 
 ### Telegram media delivery fixes
 

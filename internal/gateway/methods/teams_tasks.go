@@ -15,6 +15,7 @@ import (
 	httpapi "github.com/nextlevelbuilder/goclaw/internal/http"
 	"github.com/nextlevelbuilder/goclaw/internal/i18n"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
+	"github.com/nextlevelbuilder/goclaw/internal/tools"
 	"github.com/nextlevelbuilder/goclaw/pkg/protocol"
 )
 
@@ -191,6 +192,15 @@ func (m *TeamsMethods) handleTaskApprove(ctx context.Context, client *gateway.Cl
 
 	if len(params.Comment) > maxCommentLength {
 		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "comment too long"))
+		return
+	}
+
+	task, ok := m.loadTeamTask(ctx, client, req, locale, "teams.tasks.approve", taskID, teamID)
+	if !ok {
+		return
+	}
+	if task.Status == store.TeamTaskStatusPending && tools.TaskAwaitingLeaderApproval(task) {
+		m.approveHeldMemberRequest(ctx, client, req, locale, task, teamID, params.Comment)
 		return
 	}
 

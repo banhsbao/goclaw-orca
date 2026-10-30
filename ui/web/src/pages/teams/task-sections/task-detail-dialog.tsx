@@ -17,7 +17,7 @@ import { useWsEvent } from "@/hooks/use-ws-event";
 import { Events } from "@/api/protocol";
 import type { TeamTaskData, TeamTaskComment, TeamTaskEvent, TeamTaskAttachment } from "@/types/team";
 import type { TeamTaskEventPayload } from "@/types/team-events";
-import { taskStatusBadgeVariant, isTerminalStatus, canCancelTask, canRetryTask } from "./task-utils";
+import { taskStatusBadgeVariant, isTerminalStatus, canCancelTask, canRetryTask, isAwaitingLeaderApproval } from "./task-utils";
 import { TaskDetailContent } from "./task-detail-content";
 import { TaskDetailAttachments } from "./task-detail-attachments";
 import { TaskDetailComments } from "./task-detail-comments";
@@ -186,6 +186,8 @@ interface TaskDetailDialogProps {
   deleteTask?: (teamId: string, taskId: string) => Promise<void>;
   cancelTask?: (teamId: string, taskId: string, reason?: string) => Promise<void>;
   retryTask?: (teamId: string, taskId: string, comment: string, agentId?: string) => Promise<void>;
+  /** Releases a member request held for leader approval (teams.tasks.approve). */
+  approveTask?: (teamId: string, taskId: string, comment?: string) => Promise<void>;
   /** Team members a retried task may be (re)assigned to; the lead is excluded. */
   assignees?: TaskAssigneeOption[];
   onAddComment?: (teamId: string, taskId: string, content: string) => Promise<void>;
@@ -197,7 +199,7 @@ interface TaskDetailDialogProps {
 
 export function TaskDetailDialog({
   task, teamId, isTeamV2, onClose,
-  getTaskDetail, deleteTask, cancelTask, retryTask, assignees, onAddComment, taskLookup, memberLookup, emojiLookup, onNavigateTask,
+  getTaskDetail, deleteTask, cancelTask, retryTask, approveTask, assignees, onAddComment, taskLookup, memberLookup, emojiLookup, onNavigateTask,
 }: TaskDetailDialogProps) {
   const { t } = useTranslation("teams");
   const [events, setEvents] = useState<TeamTaskEvent[]>([]);
@@ -209,6 +211,7 @@ export function TaskDetailDialog({
   const [cancelling, setCancelling] = useState(false);
   const [retryOpen, setRetryOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [approving, setApproving] = useState(false);
 
   const loadDetail = useCallback(async () => {
     try {
@@ -258,7 +261,17 @@ export function TaskDetailDialog({
     finally { setRetrying(false); setRetryOpen(false); }
   };
 
+  const handleApprove = async () => {
+    if (!approveTask) return;
+    setApproving(true);
+    try { await approveTask(teamId, task.id); onClose(); }
+    catch { /* toast handled by hook */ }
+    finally { setApproving(false); }
+  };
+
   const ownerEmoji = resolveEmoji(task.owner_agent_id);
+  const awaitingApproval = isAwaitingLeaderApproval(task);
+  const canApprove = !!approveTask && awaitingApproval && !!task.owner_agent_id;
   const canDelete = deleteTask && isTerminalStatus(task.status);
   const canCancel = !!cancelTask && canCancelTask(task.status);
   // Without an owner the backend needs agentId, so retry is offered only when
@@ -281,6 +294,11 @@ export function TaskDetailDialog({
             <Badge variant={taskStatusBadgeVariant(task.status)} className="text-xs">
               {task.status.replace(/_/g, " ")}
             </Badge>
+            {awaitingApproval && (
+              <Badge variant="outline" className="border-sky-500/50 bg-sky-500/10 text-xs text-sky-700 dark:text-sky-400">
+                {t("tasks.badges.awaitingApproval")}
+              </Badge>
+            )}
             <TaskIdCopy id={task.id} label={t("tasks.detail.copyId")} copiedLabel={t("tasks.detail.copied")} />
           </div>
           <DialogTitle className="text-base sm:text-lg">{task.subject}</DialogTitle>
@@ -396,8 +414,14 @@ export function TaskDetailDialog({
         </div>
 
         {/* Footer */}
-        {(canRetry || canCancel || canDelete) && (
+        {(canApprove || canRetry || canCancel || canDelete) && (
           <div className="flex flex-wrap justify-end gap-2 border-t pt-3">
+            {canApprove && (
+              <Button variant="default" size="sm" onClick={handleApprove} disabled={approving}>
+                <Check className="mr-1.5 h-3.5 w-3.5" />
+                {t("tasks.approveRequest")}
+              </Button>
+            )}
             {canRetry && (
               <Button variant="default" size="sm" onClick={() => setRetryOpen(true)}>
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" />

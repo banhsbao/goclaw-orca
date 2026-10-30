@@ -112,6 +112,7 @@ export interface TeamTaskData {
   // Count badges
   comment_count?: number;
   attachment_count?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface TeamTaskComment {
