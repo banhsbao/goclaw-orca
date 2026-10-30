@@ -75,8 +75,10 @@ remaining commands.
 ## 5. Getting files back
 
 Files created on the Orca machine do not reach GoClaw on their own. The `file_inbox` tool
-issues a short-lived upload URL (30 min, 10 files, 50 MB each, in-memory, bound to the
-calling agent's workspace `inbox/` folder). The coding agent uploads with
+issues a short-lived upload URL (30 min, 10 files, 50 MB each, in-memory, bound to an
+`inbox/` folder). When the calling agent belongs to a team, the folder is the team workspace
+`inbox/`, so the leader and every teammate see the same files; otherwise it is the agent's own
+workspace `inbox/`. The tool result names the absolute folder path. The coding agent uploads with
 `curl -fsS -T <file> <url>`, and the GoClaw agent delivers the result with `send_file`.
 
 - The Orca machine must reach the gateway. Set `gateway.public_url` (or reach the gateway

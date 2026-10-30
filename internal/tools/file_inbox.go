@@ -34,7 +34,10 @@ func (t *FileInboxTool) Parameters() map[string]any {
 }
 
 func (t *FileInboxTool) Execute(ctx context.Context, _ map[string]any) *Result {
-	workspace := ToolWorkspaceFromCtx(ctx)
+	workspace := ToolTeamWorkspaceFromCtx(ctx)
+	if workspace == "" {
+		workspace = ToolWorkspaceFromCtx(ctx)
+	}
 	if workspace == "" {
 		workspace = t.workspace
 	}
@@ -61,5 +64,5 @@ func (t *FileInboxTool) Execute(ctx context.Context, _ map[string]any) *Result {
 			"Run on the remote machine for each file: curl -fsS -T <local-file> %s\n"+
 			"Files arrive in %s/<filename>. After the remote program finishes, verify with list_files and deliver with send_file.\n"+
 			"Treat the URL as a secret: do not echo it to the user.",
-		expires.UTC().Format("15:04:05"), InboxTicketMaxFiles, MaxFileSizeBytes/(1024*1024), url, inboxDirName))
+		expires.UTC().Format("15:04:05"), InboxTicketMaxFiles, MaxFileSizeBytes/(1024*1024), url, dir))
 }

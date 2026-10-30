@@ -26,8 +26,8 @@ func (h *InboxUploadHandler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *InboxUploadHandler) handlePut(w http.ResponseWriter, r *http.Request) {
 	ticket := r.PathValue("ticket")
-	name := filepath.Base(r.PathValue("filename"))
-	if name == "." || name == ".." || name == "/" || strings.ContainsAny(name, "\x00\\") || strings.HasPrefix(name, ".") {
+	name := r.PathValue("filename")
+	if name != filepath.Base(name) || strings.ContainsAny(name, "\x00\\/") || strings.HasPrefix(name, ".") {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid filename"})
 		return
 	}

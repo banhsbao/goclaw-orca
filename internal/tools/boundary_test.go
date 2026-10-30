@@ -653,3 +653,67 @@ func TestTenantAllowedPathsFromCtx_Inheritance(t *testing.T) {
 		t.Errorf("unexpected result: %v", result)
 	}
 }
+
+func countPathEscapeLogs(records []map[string]any) int {
+	n := 0
+	for _, r := range records {
+		if r["msg"] == "security.path_escape" {
+			n++
+		}
+	}
+	return n
+}
+
+func TestResolvePathWithAllowed_NoPathEscapeLogWhenPrefixAllows(t *testing.T) {
+	workspace := t.TempDir()
+	teamWs := t.TempDir()
+	teamFile := filepath.Join(teamWs, "report.md")
+	if err := os.WriteFile(teamFile, []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var err error
+	records, _ := capturedAudit(t, func() {
+		_, err = resolvePathWithAllowed(teamFile, workspace, true, []string{teamWs})
+	})
+	if err != nil {
+		t.Fatalf("expected access via allowed prefix, got %v", err)
+	}
+	if n := countPathEscapeLogs(records); n != 0 {
+		t.Fatalf("expected no security.path_escape log, got %d", n)
+	}
+}
+
+func TestResolvePathWithAllowed_LogsPathEscapeWhenDenied(t *testing.T) {
+	workspace := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(outside, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var err error
+	records, _ := capturedAudit(t, func() {
+		_, err = resolvePathWithAllowed(outside, workspace, true, []string{t.TempDir()})
+	})
+	if err == nil || !strings.Contains(err.Error(), "path outside workspace") {
+		t.Fatalf("expected path outside workspace error, got %v", err)
+	}
+	if n := countPathEscapeLogs(records); n != 1 {
+		t.Fatalf("expected 1 security.path_escape log, got %d", n)
+	}
+}
+
+func TestResolvePath_LogsPathEscape(t *testing.T) {
+	workspace := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(outside, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	records, _ := capturedAudit(t, func() {
+		_, _ = resolvePath(outside, workspace, true)
+	})
+	if n := countPathEscapeLogs(records); n != 1 {
+		t.Fatalf("expected 1 security.path_escape log, got %d", n)
+	}
+}

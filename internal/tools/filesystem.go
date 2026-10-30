@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -394,7 +395,7 @@ func buildAllowedPrefixes(ctx context.Context, base []string, includeTeamRoot bo
 
 // resolvePathWithAllowed is like resolvePath but also allows paths under extra prefixes.
 func resolvePathWithAllowed(path, workspace string, restrict bool, allowedPrefixes []string) (string, error) {
-	resolved, err := resolvePath(path, workspace, restrict)
+	resolved, err := resolvePathInWorkspace(path, workspace, restrict)
 	if err == nil {
 		return resolved, nil
 	}
@@ -407,6 +408,7 @@ func resolvePathWithAllowed(path, workspace string, restrict bool, allowedPrefix
 		// Try resolving parent for non-existent files
 		parentReal, parentErr := filepath.EvalSymlinks(filepath.Dir(absPath))
 		if parentErr != nil {
+			warnPathEscape(err)
 			return "", err
 		}
 		real = filepath.Join(parentReal, filepath.Base(absPath))
@@ -432,6 +434,7 @@ func resolvePathWithAllowed(path, workspace string, restrict bool, allowedPrefix
 			return real, nil
 		}
 	}
+	warnPathEscape(err)
 	slog.Warn("read_file: access denied", "path", cleaned, "workspace", workspace, "allowedPrefixes", allowedPrefixes)
 	return "", err
 }
@@ -500,6 +503,29 @@ func isBinaryFileExt(path string) bool {
 // When restrict=true, resolves symlinks to canonical paths and rejects
 // paths that escape the workspace boundary (symlink/hardlink attacks).
 func resolvePath(path, workspace string, restrict bool) (string, error) {
+	resolved, err := resolvePathInWorkspace(path, workspace, restrict)
+	if err != nil {
+		warnPathEscape(err)
+	}
+	return resolved, err
+}
+
+type pathEscapeError struct {
+	path      string
+	resolved  string
+	workspace string
+}
+
+func (e *pathEscapeError) Error() string { return "access denied: path outside workspace" }
+
+func warnPathEscape(err error) {
+	var escape *pathEscapeError
+	if errors.As(err, &escape) {
+		slog.Warn("security.path_escape", "path", escape.path, "resolved", escape.resolved, "workspace", escape.workspace)
+	}
+}
+
+func resolvePathInWorkspace(path, workspace string, restrict bool) (string, error) {
 	var resolved string
 	if filepath.IsAbs(path) {
 		resolved = filepath.Clean(path)
@@ -567,8 +593,7 @@ func resolvePath(path, workspace string, restrict bool) (string, error) {
 
 	// Validate canonical path stays within canonical workspace.
 	if !isPathInside(real, wsReal) {
-		slog.Warn("security.path_escape", "path", path, "resolved", real, "workspace", wsReal)
-		return "", fmt.Errorf("access denied: path outside workspace")
+		return "", &pathEscapeError{path: path, resolved: real, workspace: wsReal}
 	}
 
 	// Reject paths with mutable symlink components (TOCTOU symlink rebind risk).

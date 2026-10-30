@@ -4,6 +4,18 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ---
 
+## 2026-10-30
+
+### Orca file hand-off fixes
+
+**Fixes**
+
+- `file_inbox` binds the upload ticket to the team workspace `inbox/` when the agent runs in a team. Before, a team leader chatting from a channel got a ticket for its personal workspace, so teammates looked in the team `inbox/`, saw nothing, and asked for a re-upload. The result now prints the absolute inbox path.
+- `security.path_escape` is logged only when a path is finally denied. Reads that fall outside the agent workspace but inside an allowed prefix (team workspace, tenant paths) no longer emit a false security warning.
+- `PUT /v1/inbox/{ticket}/{filename}` rejects filenames that contain a path separator (including an encoded `%2F`) instead of silently reducing them to their base name.
+
+---
+
 ## 2026-10-29
 
 ### Async Orca handoffs
