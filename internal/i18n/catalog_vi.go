@@ -347,6 +347,9 @@ func init() {
 		MsgGitCredHostScopeInvalid:         "host_scope %q không phải là tên máy chủ hợp lệ",
 		MsgGitCredBlobMissingField:         "blob credential thiếu trường bắt buộc %q",
 		MsgGitCredUnsupportedCredType:      "credential_type %q không được hỗ trợ",
+		MsgSecureCLILabelInvalid:           "nhãn server %q không hợp lệ: dùng 1-32 chữ thường, chữ số, '-' hoặc '_' (\"default\" được dành riêng)",
+		MsgSecureCLILabelLimit:             "quá nhiều nhãn server: tối đa %d",
+		MsgSecureCLIDescriptionTooLong:     "mô tả quá dài: tối đa %d ký tự",
 
 		// Message tool cross-target forward notice
 		MessageCrossTargetForwarded: "📤 Đã forward sang %s theo yêu cầu: %q",

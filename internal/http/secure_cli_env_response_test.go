@@ -108,13 +108,13 @@ func TestSecureCLIUserCredentialsGetDoesNotReturnLegacySensitiveRaw(t *testing.T
 			UserID:       "user-1",
 			EncryptedEnv: []byte(`{"TOKEN":"secret-token","REGION":{"kind":"value","value":"asia-southeast1"}}`),
 		},
-	}, nil)
+	}, nil, newTenantAdminStoreForCredentials())
 	req := httptest.NewRequest(http.MethodGet, "/v1/cli-credentials/"+binaryID.String()+"/user-credentials/user-1", nil)
 	req.SetPathValue("id", binaryID.String())
 	req.SetPathValue("userId", "user-1")
 	rec := httptest.NewRecorder()
 
-	h.handleGetUserCredentials(rec, req)
+	h.handleGetUserCredentials(rec, withTenantAdminContext(req))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())

@@ -22,9 +22,23 @@ func NewInboxUploadHandler(tickets *tools.InboxTicketStore) *InboxUploadHandler 
 
 func (h *InboxUploadHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /v1/inbox/{ticket}/{filename}", h.handlePut)
+	mux.HandleFunc("OPTIONS /v1/inbox/{ticket}/{filename}", h.handlePreflight)
+}
+
+func setInboxCORS(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "PUT, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Max-Age", "600")
+}
+
+func (h *InboxUploadHandler) handlePreflight(w http.ResponseWriter, r *http.Request) {
+	setInboxCORS(w)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *InboxUploadHandler) handlePut(w http.ResponseWriter, r *http.Request) {
+	setInboxCORS(w)
 	ticket := r.PathValue("ticket")
 	name := r.PathValue("filename")
 	if name != filepath.Base(name) || strings.ContainsAny(name, "\x00\\/") || strings.HasPrefix(name, ".") {

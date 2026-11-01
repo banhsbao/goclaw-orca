@@ -18,11 +18,15 @@ import (
 // userCredSelectCols projects every column callers read off SecureCLIUserCredential.
 // Keep in lockstep with the struct in internal/store/secure_cli_store.go.
 const userCredSelectCols = `id, binary_id, user_id, encrypted_env, COALESCE(metadata, '{}'),
- credential_type, host_scope, created_at, updated_at`
+ credential_type, host_scope, created_at, updated_at, label, description`
 
 // GetUserCredentials returns per-user credential overrides for a CLI binary.
 // Returns (nil, nil) if no per-user credentials exist.
 func (s *SQLiteSecureCLIStore) GetUserCredentials(ctx context.Context, binaryID uuid.UUID, userID string) (*store.SecureCLIUserCredential, error) {
+	return s.getUserCredential(ctx, binaryID, userID, "")
+}
+
+func (s *SQLiteSecureCLIStore) getUserCredential(ctx context.Context, binaryID uuid.UUID, userID, label string) (*store.SecureCLIUserCredential, error) {
 	tid := store.TenantIDFromContext(ctx)
 	if tid == uuid.Nil {
 		tid = store.MasterTenantID
@@ -36,10 +40,10 @@ func (s *SQLiteSecureCLIStore) GetUserCredentials(ctx context.Context, binaryID 
 	err := s.db.QueryRowContext(ctx,
 		`SELECT `+userCredSelectCols+`
 		 FROM secure_cli_user_credentials
-		 WHERE binary_id = ? AND user_id = ? AND tenant_id = ?`,
-		binaryID, userID, tid,
+		 WHERE binary_id = ? AND user_id = ? AND tenant_id = ? AND label = ?`,
+		binaryID, userID, tid, label,
 	).Scan(&uc.ID, &uc.BinaryID, &uc.UserID, &env, &metaBytes,
-		&uc.CredentialType, &uc.HostScope, &createdAt, &updatedAt)
+		&uc.CredentialType, &uc.HostScope, &createdAt, &updatedAt, &uc.Label, &uc.Description)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -75,6 +79,10 @@ func (s *SQLiteSecureCLIStore) SetUserCredentials(ctx context.Context, binaryID 
 // SetUserCredentialsTyped is the typed-credential entry point.
 // credentialType / hostScope are NULL for legacy env-only credentials.
 func (s *SQLiteSecureCLIStore) SetUserCredentialsTyped(ctx context.Context, binaryID uuid.UUID, userID string, encryptedEnv []byte, credentialType, hostScope *string) error {
+	return s.setUserCredential(ctx, binaryID, userID, "", nil, encryptedEnv, credentialType, hostScope)
+}
+
+func (s *SQLiteSecureCLIStore) setUserCredential(ctx context.Context, binaryID uuid.UUID, userID, label string, description *string, encryptedEnv []byte, credentialType, hostScope *string) error {
 	tid := store.TenantIDFromContext(ctx)
 	if tid == uuid.Nil {
 		tid = store.MasterTenantID
@@ -97,27 +105,32 @@ func (s *SQLiteSecureCLIStore) SetUserCredentialsTyped(ctx context.Context, bina
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO secure_cli_user_credentials
 		   (id, binary_id, user_id, encrypted_env, metadata, tenant_id,
-		    credential_type, host_scope, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)
-		 ON CONFLICT (binary_id, user_id, tenant_id) DO UPDATE SET
+		    credential_type, host_scope, label, description, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, '{}', ?, ?, ?, ?, COALESCE(?, ''), ?, ?)
+		 ON CONFLICT (binary_id, user_id, tenant_id, label) DO UPDATE SET
 		   encrypted_env   = excluded.encrypted_env,
 		   credential_type = excluded.credential_type,
 		   host_scope      = excluded.host_scope,
+		   description     = COALESCE(?, secure_cli_user_credentials.description),
 		   updated_at      = excluded.updated_at`,
-		id, binaryID, userID, envBytes, tid, credentialType, hostScope, now, now,
+		id, binaryID, userID, envBytes, tid, credentialType, hostScope, label, description, now, now, description,
 	)
 	return err
 }
 
 // DeleteUserCredentials removes per-user credentials for a binary.
 func (s *SQLiteSecureCLIStore) DeleteUserCredentials(ctx context.Context, binaryID uuid.UUID, userID string) error {
+	return s.deleteUserCredential(ctx, binaryID, userID, "")
+}
+
+func (s *SQLiteSecureCLIStore) deleteUserCredential(ctx context.Context, binaryID uuid.UUID, userID, label string) error {
 	tid := store.TenantIDFromContext(ctx)
 	if tid == uuid.Nil {
 		tid = store.MasterTenantID
 	}
 	_, err := s.db.ExecContext(ctx,
-		`DELETE FROM secure_cli_user_credentials WHERE binary_id = ? AND user_id = ? AND tenant_id = ?`,
-		binaryID, userID, tid,
+		`DELETE FROM secure_cli_user_credentials WHERE binary_id = ? AND user_id = ? AND tenant_id = ? AND label = ?`,
+		binaryID, userID, tid, label,
 	)
 	return err
 }
@@ -133,7 +146,7 @@ func (s *SQLiteSecureCLIStore) ListUserCredentials(ctx context.Context, binaryID
 		`SELECT `+userCredSelectCols+`
 		 FROM secure_cli_user_credentials
 		 WHERE binary_id = ? AND tenant_id = ?
-		 ORDER BY created_at`, binaryID, tid)
+		 ORDER BY label, created_at`, binaryID, tid)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +160,7 @@ func (s *SQLiteSecureCLIStore) ListUserCredentials(ctx context.Context, binaryID
 		var createdAt, updatedAt string
 
 		if err := rows.Scan(&uc.ID, &uc.BinaryID, &uc.UserID, &env, &metaBytes,
-			&uc.CredentialType, &uc.HostScope, &createdAt, &updatedAt); err != nil {
+			&uc.CredentialType, &uc.HostScope, &createdAt, &updatedAt, &uc.Label, &uc.Description); err != nil {
 			return nil, err
 		}
 

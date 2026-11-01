@@ -13,8 +13,17 @@ All notable changes to GoClaw are documented here. For full documentation, see [
   registration intentionally stays on v1 `imbot.register` — v2 `imbot.v2.Bot.register`
   changes the event-delivery model (per-event handler URLs → `eventMode`), which would
   require rewriting the inbound event parser. No user-facing behavior change.
+- **User-credential routes require tenant admin** — `/v1/cli-credentials/{id}/user-credentials/...`
+  now use the same tenant owner/admin guard as agent credentials. Non-member admins get `403`;
+  requests without tenant context get `400`.
 
 ### Added
+
+- **Labeled Secure CLI credentials (multiple servers)** — a binary can hold one credential per
+  machine, each with a `label` (lowercase `[a-z0-9_-]`, max 32, `default` reserved) and a
+  `description` (max 200). Agents pick a machine with `orca --server <label> <subcommand> --json`;
+  TOOLS.md lists the servers. Up to 20 labels per user or agent per binary. Unlabeled credentials
+  keep working as the default. Schema: PostgreSQL migration `000100`, SQLite schema 61.
 
 - **Task detail dialog shows the full task UUID with one-click copy** — the
   short identifier (`T-015-cc8e`) carries only the last four hex characters of

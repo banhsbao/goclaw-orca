@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/select";
 import { CliCredentialEnvVarsSection, type ManualEnvEntry } from "./cli-credential-env-vars-section";
 import { CliCredentialGitFields, type GitCredentialType } from "./cli-credential-git-fields";
+import { CliCredentialLabelFields } from "./cli-credential-label-fields";
 import type { AgentData } from "@/types/agent";
 import type { SecureCLIBinary } from "./hooks/use-cli-credentials";
 
@@ -15,6 +16,10 @@ interface Props {
   agentId: string;
   setAgentId: (v: string) => void;
   editing: boolean;
+  label: string;
+  setLabel: (v: string) => void;
+  description: string;
+  setDescription: (v: string) => void;
   envEntries: ManualEnvEntry[];
   setEnvEntries: Dispatch<SetStateAction<ManualEnvEntry[]>>;
   gitType: GitCredentialType;
@@ -50,6 +55,14 @@ export function CliAgentCredentialForm(props: Props) {
           </SelectContent>
         </Select>
       </div>
+
+      <CliCredentialLabelFields
+        label={props.label}
+        onLabelChange={props.setLabel}
+        description={props.description}
+        onDescriptionChange={props.setDescription}
+        labelLocked={props.editing}
+      />
 
       {isGit ? (
         <CliCredentialGitFields

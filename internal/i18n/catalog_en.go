@@ -347,6 +347,9 @@ func init() {
 		MsgGitCredHostScopeInvalid:         "host_scope %q is not a valid hostname",
 		MsgGitCredBlobMissingField:         "credential blob is missing required field %q",
 		MsgGitCredUnsupportedCredType:      "credential_type %q is not supported",
+		MsgSecureCLILabelInvalid:           "invalid server label %q: use 1-32 lowercase letters, digits, '-' or '_' (\"default\" is reserved)",
+		MsgSecureCLILabelLimit:             "too many server labels: max %d",
+		MsgSecureCLIDescriptionTooLong:     "description too long: max %d characters",
 
 		// Message tool cross-target forward notice
 		MessageCrossTargetForwarded: "📤 Forwarded to %s as requested: %q",

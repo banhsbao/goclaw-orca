@@ -33,6 +33,8 @@ export function CLIAgentCredentialsContent({ binary, onClose }: Props) {
   const [view, setView] = useState<ViewState>("list");
   const [editEntry, setEditEntry] = useState<CLIAgentCredential | null>(null);
   const [agentId, setAgentId] = useState("");
+  const [label, setLabel] = useState("");
+  const [description, setDescription] = useState("");
   const [envEntries, setEnvEntries] = useState<ManualEnvEntry[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -52,6 +54,8 @@ export function CLIAgentCredentialsContent({ binary, onClose }: Props) {
   const clearForm = () => {
     setEditEntry(null);
     setAgentId("");
+    setLabel("");
+    setDescription("");
     setEnvEntries([]);
     setGitType(isGit ? "pat" : "env");
     setGitHostScope(isGit ? "github.com" : "");
@@ -74,10 +78,12 @@ export function CLIAgentCredentialsContent({ binary, onClose }: Props) {
   const openEdit = async (entry: CLIAgentCredential) => {
     setEditEntry(entry);
     setAgentId(entry.agent_id);
+    setLabel(entry.label ?? "");
+    setDescription(entry.description ?? "");
     setGitErrorKey(undefined);
     setView("form");
     try {
-      const res = await getCredential(entry.agent_id);
+      const res = await getCredential(entry.agent_id, entry.label ?? "");
       setEnvEntries(entriesFromEnv(res.env));
       if (isGit) {
         const nextType = (res.credential_type ?? "env") as GitCredentialType;
@@ -110,14 +116,17 @@ export function CLIAgentCredentialsContent({ binary, onClose }: Props) {
       else setGitErrorKey(result.errorKey);
       return;
     }
-    if (result.kind === "no_change") {
+    const descriptionChanged = editEntry !== null && description !== (editEntry.description ?? "");
+    if (result.kind === "no_change" && !descriptionChanged) {
       toast.success(t("agentCredentials.saved"));
       setView("list");
       return;
     }
+    const base = result.kind === "no_change" ? {} : result.payload;
+    const payload = editEntry !== null || description.trim() ? { ...base, description } : base;
     setSaving(true);
     try {
-      await setCredential(agentId, result.payload);
+      await setCredential(agentId, payload, label.trim());
       clearForm();
       setView("list");
     } catch (err) {
@@ -129,9 +138,9 @@ export function CLIAgentCredentialsContent({ binary, onClose }: Props) {
   };
 
   const handleDelete = async (entry: CLIAgentCredential) => {
-    setDeleting(entry.agent_id);
+    setDeleting(entry.id);
     try {
-      await deleteCredential(entry.agent_id);
+      await deleteCredential(entry.agent_id, entry.label ?? "");
     } finally {
       setDeleting(null);
     }
@@ -160,6 +169,10 @@ export function CLIAgentCredentialsContent({ binary, onClose }: Props) {
             agentId={agentId}
             setAgentId={setAgentId}
             editing={editEntry !== null}
+            label={label}
+            setLabel={setLabel}
+            description={description}
+            setDescription={setDescription}
             envEntries={envEntries}
             setEnvEntries={setEnvEntries}
             gitType={gitType}

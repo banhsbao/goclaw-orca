@@ -30,8 +30,14 @@ export function CliAgentCredentialList({ entries, agentNameMap, deleting, onEdit
               <span className="truncate text-sm font-medium">
                 {entry.name || agentNameMap.get(entry.agent_id) || entry.agent_key || entry.agent_id}
               </span>
+              {entry.label ? (
+                <Badge variant="outline" className="shrink-0 font-mono text-xs">{entry.label}</Badge>
+              ) : null}
               <Badge variant="secondary" className="shrink-0 text-xs">{credentialLabel(entry)}</Badge>
             </div>
+            {entry.description ? (
+              <p className="truncate text-xs text-muted-foreground" title={entry.description}>{entry.description}</p>
+            ) : null}
             {entry.host_scope ? (
               <p className="truncate font-mono text-xs text-muted-foreground">{entry.host_scope}</p>
             ) : null}
@@ -45,10 +51,10 @@ export function CliAgentCredentialList({ entries, agentNameMap, deleting, onEdit
               size="icon"
               className="h-8 w-8 text-destructive hover:text-destructive"
               onClick={() => onDelete(entry)}
-              disabled={deleting === entry.agent_id}
+              disabled={deleting === entry.id}
               title={t("agentCredentials.delete")}
             >
-              {deleting === entry.agent_id ? (
+              {deleting === entry.id ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <Trash2 className="h-3.5 w-3.5" />

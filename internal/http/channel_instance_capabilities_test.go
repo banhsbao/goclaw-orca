@@ -211,3 +211,91 @@ func TestChannelContextCapabilitiesExposeOnlyCredentialMetadata(t *testing.T) {
 		t.Fatalf("secure cli capability = %+v", body.SecureCLI)
 	}
 }
+
+type labeledChannelCapabilityCLIStore struct {
+	*fakeChannelCapabilityCLIStore
+	labels []store.SecureCLICredentialLabel
+}
+
+func (s *labeledChannelCapabilityCLIStore) ListCredentialLabels(_ context.Context, q store.SecureCLICredentialLabelQuery) ([]store.SecureCLICredentialLabel, error) {
+	if q.UserID == "" {
+		return nil, nil
+	}
+	return s.labels, nil
+}
+func (s *labeledChannelCapabilityCLIStore) ResolveLabeledCredential(context.Context, uuid.UUID, *uuid.UUID, string, string) (*store.SecureCLIResolvedCredential, error) {
+	return nil, nil
+}
+func (s *labeledChannelCapabilityCLIStore) GetUserCredentialByLabel(context.Context, uuid.UUID, string, string) (*store.SecureCLIUserCredential, error) {
+	return nil, nil
+}
+func (s *labeledChannelCapabilityCLIStore) SetUserCredentialLabeled(context.Context, uuid.UUID, string, store.SecureCLICredentialWrite) error {
+	return nil
+}
+func (s *labeledChannelCapabilityCLIStore) DeleteUserCredentialByLabel(context.Context, uuid.UUID, string, string) error {
+	return nil
+}
+func (s *labeledChannelCapabilityCLIStore) GetAgentCredentialByLabel(context.Context, uuid.UUID, uuid.UUID, string) (*store.SecureCLIAgentCredential, error) {
+	return nil, nil
+}
+func (s *labeledChannelCapabilityCLIStore) SetAgentCredentialLabeled(context.Context, uuid.UUID, uuid.UUID, store.SecureCLICredentialWrite, string) error {
+	return nil
+}
+func (s *labeledChannelCapabilityCLIStore) DeleteAgentCredentialByLabel(context.Context, uuid.UUID, uuid.UUID, string) error {
+	return nil
+}
+
+func TestChannelCapabilitiesCountLabeledOnlyUserCredential(t *testing.T) {
+	token := "channel-capabilities-labeled-key"
+	setupTestCache(t, map[string]*store.APIKeyData{
+		crypto.HashAPIKey(token): {Scopes: []string{"operator.write"}, OwnerID: "tenant-user-1"},
+	})
+	instID := uuid.New()
+	agentID := uuid.New()
+	channelName := "discord-admin"
+	withLabel, noRows := uuid.New(), uuid.New()
+	cliStore := &labeledChannelCapabilityCLIStore{
+		fakeChannelCapabilityCLIStore: &fakeChannelCapabilityCLIStore{
+			binaries: []store.SecureCLIBinary{
+				{BaseModel: store.BaseModel{ID: withLabel}, BinaryName: "orca", IsGlobal: true, Enabled: true},
+				{BaseModel: store.BaseModel{ID: noRows}, BinaryName: "gh", IsGlobal: true, Enabled: true},
+			},
+		},
+		labels: []store.SecureCLICredentialLabel{
+			{BinaryID: withLabel, Label: "build-vm", Source: "user"},
+			{BinaryID: noRows, Label: "ci", Source: "agent"},
+		},
+	}
+	handler := NewChannelInstancesHandler(
+		&stubChannelInstanceStore{inst: &store.ChannelInstanceData{BaseModel: store.BaseModel{ID: instID}, Name: channelName, ChannelType: "discord", AgentID: agentID}},
+		nil, nil, nil, nil, nil,
+	)
+	handler.SetCapabilityStores(&fakeChannelCapabilityMCPStore{}, cliStore)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/channels/instances/"+instID.String()+"/contexts/channel/"+channelName+"/capabilities", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d; body=%s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		SecureCLI []channelCapabilityDTO `json:"secure_cli"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]channelCapabilityDTO{}
+	for _, row := range body.SecureCLI {
+		byName[row.Name] = row
+	}
+	if got := byName["orca"]; got.CredentialSource != "user" || !got.HasCredential {
+		t.Fatalf("labeled-only user must count as credential, got %+v", got)
+	}
+	if got := byName["gh"]; got.CredentialSource != "global" || got.HasCredential {
+		t.Fatalf("agent-sourced label must not count as user credential, got %+v", got)
+	}
+}

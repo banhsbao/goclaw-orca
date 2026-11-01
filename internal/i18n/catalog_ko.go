@@ -181,10 +181,13 @@ func init() {
 
 		MsgInvalidRole: "잘못된 역할: 허용되는 값은 owner, admin, operator, member, viewer입니다",
 
-		MsgContactIDsRequired:  "contact_ids가 필요합니다",
-		MsgMergeTargetRequired: "tenant_user_id 또는 create_user 중 정확히 하나가 필요합니다",
-		MsgTenantUserNotFound:  "테넌트 사용자를 찾을 수 없습니다",
-		MsgTenantMismatch:      "테넌트 사용자가 이 테넌트에 속하지 않습니다",
-		MsgTenantScopeRequired: "이 작업에는 테넌트 범위가 필요합니다",
+		MsgContactIDsRequired:          "contact_ids가 필요합니다",
+		MsgMergeTargetRequired:         "tenant_user_id 또는 create_user 중 정확히 하나가 필요합니다",
+		MsgTenantUserNotFound:          "테넌트 사용자를 찾을 수 없습니다",
+		MsgTenantMismatch:              "테넌트 사용자가 이 테넌트에 속하지 않습니다",
+		MsgTenantScopeRequired:         "이 작업에는 테넌트 범위가 필요합니다",
+		MsgSecureCLILabelInvalid:       "서버 레이블 %q이(가) 올바르지 않습니다: 소문자, 숫자, '-' 또는 '_' 1-32자를 사용하세요 (\"default\"는 예약어)",
+		MsgSecureCLILabelLimit:         "서버 레이블이 너무 많습니다: 최대 %d개",
+		MsgSecureCLIDescriptionTooLong: "설명이 너무 깁니다: 최대 %d자",
 	})
 }

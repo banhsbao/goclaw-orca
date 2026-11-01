@@ -16,7 +16,7 @@ import (
 )
 
 const agentCredSelectCols = `c.id, c.binary_id, c.agent_id, c.encrypted_env, COALESCE(c.metadata, '{}'),
-	 c.credential_type, c.host_scope, c.created_by, c.created_at, c.updated_at`
+	 c.credential_type, c.host_scope, c.created_by, c.created_at, c.updated_at, c.label, c.description`
 
 func agentCredentialTenantID(ctx context.Context) (uuid.UUID, error) {
 	tid := store.TenantIDFromContext(ctx)
@@ -53,6 +53,10 @@ func (s *SQLiteSecureCLIStore) AgentExists(ctx context.Context, agentID uuid.UUI
 }
 
 func (s *SQLiteSecureCLIStore) GetAgentCredentials(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID) (*store.SecureCLIAgentCredential, error) {
+	return s.getAgentCredential(ctx, binaryID, agentID, "")
+}
+
+func (s *SQLiteSecureCLIStore) getAgentCredential(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID, label string) (*store.SecureCLIAgentCredential, error) {
 	tid, err := agentCredentialTenantID(ctx)
 	if err != nil {
 		return nil, err
@@ -65,10 +69,10 @@ func (s *SQLiteSecureCLIStore) GetAgentCredentials(ctx context.Context, binaryID
 		`SELECT `+agentCredSelectCols+`, COALESCE(a.agent_key, ''), COALESCE(a.display_name, '')
 		 FROM secure_cli_agent_credentials c
 		 LEFT JOIN agents a ON a.id = c.agent_id AND a.tenant_id = c.tenant_id
-		 WHERE c.binary_id = ? AND c.agent_id = ? AND c.tenant_id = ?`,
-		binaryID, agentID, tid,
+		 WHERE c.binary_id = ? AND c.agent_id = ? AND c.tenant_id = ? AND c.label = ?`,
+		binaryID, agentID, tid, label,
 	).Scan(&c.ID, &c.BinaryID, &c.AgentID, &env, &metaBytes,
-		&c.CredentialType, &c.HostScope, &c.CreatedBy, &createdAt, &updatedAt,
+		&c.CredentialType, &c.HostScope, &c.CreatedBy, &createdAt, &updatedAt, &c.Label, &c.Description,
 		&c.AgentKey, &c.Name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -88,6 +92,10 @@ func (s *SQLiteSecureCLIStore) SetAgentCredentials(ctx context.Context, binaryID
 }
 
 func (s *SQLiteSecureCLIStore) SetAgentCredentialsTyped(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID, encryptedEnv []byte, credentialType, hostScope *string, createdBy string) error {
+	return s.setAgentCredential(ctx, binaryID, agentID, "", nil, encryptedEnv, credentialType, hostScope, createdBy)
+}
+
+func (s *SQLiteSecureCLIStore) setAgentCredential(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID, label string, description *string, encryptedEnv []byte, credentialType, hostScope *string, createdBy string) error {
 	tid, err := agentCredentialTenantID(ctx)
 	if err != nil {
 		return err
@@ -101,19 +109,20 @@ func (s *SQLiteSecureCLIStore) SetAgentCredentialsTyped(ctx context.Context, bin
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO secure_cli_agent_credentials
 		   (id, binary_id, agent_id, encrypted_env, metadata, tenant_id,
-		    credential_type, host_scope, created_by, created_at, updated_at)
-		 SELECT ?, b.id, a.id, ?, '{}', ?, ?, ?, ?, ?, ?
+		    credential_type, host_scope, created_by, label, description, created_at, updated_at)
+		 SELECT ?, b.id, a.id, ?, '{}', ?, ?, ?, ?, ?, COALESCE(?, ''), ?, ?
 		 FROM secure_cli_binaries b
 		 JOIN agents a ON a.id = ? AND a.tenant_id = ? AND a.deleted_at IS NULL
 		 WHERE b.id = ? AND b.tenant_id = ?
-		 ON CONFLICT (binary_id, agent_id, tenant_id) DO UPDATE SET
+		 ON CONFLICT (binary_id, agent_id, tenant_id, label) DO UPDATE SET
 		   encrypted_env   = excluded.encrypted_env,
 		   credential_type = excluded.credential_type,
 		   host_scope      = excluded.host_scope,
 		   created_by      = excluded.created_by,
+		   description     = COALESCE(?, secure_cli_agent_credentials.description),
 		   updated_at      = excluded.updated_at`,
-		id, envBytes, tid, credentialType, hostScope, createdBy, now, now,
-		agentID, tid, binaryID, tid,
+		id, envBytes, tid, credentialType, hostScope, createdBy, label, description, now, now,
+		agentID, tid, binaryID, tid, description,
 	)
 	if err != nil {
 		return err
@@ -125,13 +134,17 @@ func (s *SQLiteSecureCLIStore) SetAgentCredentialsTyped(ctx context.Context, bin
 }
 
 func (s *SQLiteSecureCLIStore) DeleteAgentCredentials(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID) error {
+	return s.deleteAgentCredential(ctx, binaryID, agentID, "")
+}
+
+func (s *SQLiteSecureCLIStore) deleteAgentCredential(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID, label string) error {
 	tid, err := agentCredentialTenantID(ctx)
 	if err != nil {
 		return err
 	}
 	_, err = s.db.ExecContext(ctx,
-		`DELETE FROM secure_cli_agent_credentials WHERE binary_id = ? AND agent_id = ? AND tenant_id = ?`,
-		binaryID, agentID, tid,
+		`DELETE FROM secure_cli_agent_credentials WHERE binary_id = ? AND agent_id = ? AND tenant_id = ? AND label = ?`,
+		binaryID, agentID, tid, label,
 	)
 	return err
 }
@@ -146,7 +159,7 @@ func (s *SQLiteSecureCLIStore) ListAgentCredentials(ctx context.Context, binaryI
 		 FROM secure_cli_agent_credentials c
 		 LEFT JOIN agents a ON a.id = c.agent_id AND a.tenant_id = c.tenant_id
 		 WHERE c.binary_id = ? AND c.tenant_id = ?
-		 ORDER BY c.created_at`, binaryID, tid)
+		 ORDER BY c.label, c.created_at`, binaryID, tid)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +172,7 @@ func (s *SQLiteSecureCLIStore) ListAgentCredentials(ctx context.Context, binaryI
 		var metaBytes []byte
 		var createdAt, updatedAt string
 		if err := rows.Scan(&c.ID, &c.BinaryID, &c.AgentID, &env, &metaBytes,
-			&c.CredentialType, &c.HostScope, &c.CreatedBy, &createdAt, &updatedAt,
+			&c.CredentialType, &c.HostScope, &c.CreatedBy, &createdAt, &updatedAt, &c.Label, &c.Description,
 			&c.AgentKey, &c.Name); err != nil {
 			return nil, err
 		}

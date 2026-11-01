@@ -376,7 +376,7 @@ func (s *PGSecureCLIStore) LookupByBinary(ctx context.Context, binaryName string
 		query += ` LEFT JOIN secure_cli_agent_grants g ON FALSE` // never match
 	}
 	if agentID != nil {
-		query += fmt.Sprintf(` LEFT JOIN secure_cli_agent_credentials ac ON ac.binary_id = b.id AND ac.agent_id = $%d`, argIdx)
+		query += fmt.Sprintf(` LEFT JOIN secure_cli_agent_credentials ac ON ac.binary_id = b.id AND ac.agent_id = $%d AND ac.label = ''`, argIdx)
 		args = append(args, *agentID)
 		argIdx++
 		if !isCross {
@@ -388,7 +388,7 @@ func (s *PGSecureCLIStore) LookupByBinary(ctx context.Context, binaryName string
 
 	// LEFT JOIN user credentials
 	if userID != "" {
-		joinClause = fmt.Sprintf(` LEFT JOIN secure_cli_user_credentials uc ON uc.binary_id = b.id AND uc.user_id = $%d`, argIdx)
+		joinClause = fmt.Sprintf(` LEFT JOIN secure_cli_user_credentials uc ON uc.binary_id = b.id AND uc.user_id = $%d AND uc.label = ''`, argIdx)
 		args = append(args, userID)
 		argIdx++
 		if !isCross {

@@ -347,6 +347,9 @@ func init() {
 		MsgGitCredHostScopeInvalid:         "host_scope %q 不是有效的主机名",
 		MsgGitCredBlobMissingField:         "凭据 blob 缺少必填字段 %q",
 		MsgGitCredUnsupportedCredType:      "不支持的 credential_type %q",
+		MsgSecureCLILabelInvalid:           "服务器标签 %q 无效：请使用 1-32 位小写字母、数字、'-' 或 '_'（\"default\" 为保留字）",
+		MsgSecureCLILabelLimit:             "服务器标签过多：最多 %d 个",
+		MsgSecureCLIDescriptionTooLong:     "描述过长：最多 %d 个字符",
 
 		// Message tool cross-target forward notice
 		MessageCrossTargetForwarded: "📤 已按请求转发至 %s:%q",

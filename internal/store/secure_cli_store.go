@@ -46,11 +46,12 @@ type SecureCLIBinary struct {
 	UserHostScope      *string `json:"-" db:"-"`
 	// CredentialEnv + metadata carry the effective typed credential selected
 	// for runtime injection. Source can be "user", "context", "agent", or "".
-	CredentialEnv       []byte  `json:"-" db:"-"`
-	CredentialType      *string `json:"-" db:"-"`
-	CredentialHostScope *string `json:"-" db:"-"`
-	CredentialSource    string  `json:"credential_source,omitempty" db:"-"`
-	CredentialSubjectID string  `json:"credential_subject_id,omitempty" db:"-"`
+	CredentialEnv       []byte                     `json:"-" db:"-"`
+	CredentialType      *string                    `json:"-" db:"-"`
+	CredentialHostScope *string                    `json:"-" db:"-"`
+	CredentialSource    string                     `json:"credential_source,omitempty" db:"-"`
+	CredentialSubjectID string                     `json:"credential_subject_id,omitempty" db:"-"`
+	CredentialLabels    []SecureCLICredentialLabel `json:"-" db:"-"`
 	// EnvKeys is set by HTTP handlers only (names from decrypted env, no values); not a DB column.
 	EnvKeys []string `json:"env_keys,omitempty" db:"-"`
 	// Env is set by HTTP handlers only. Sensitive values are masked; value entries are visible.
@@ -117,7 +118,9 @@ type SecureCLIUserCredential struct {
 	CredentialType *string `json:"credential_type,omitempty" db:"credential_type"`
 	// HostScope binds the credential to a specific hostname (e.g. 'github.com').
 	// Required when CredentialType ∈ {'pat','ssh_key'}; NULL for legacy env creds.
-	HostScope *string `json:"host_scope,omitempty" db:"host_scope"`
+	HostScope   *string `json:"host_scope,omitempty" db:"host_scope"`
+	Label       string  `json:"label" db:"label"`
+	Description string  `json:"description" db:"description"`
 }
 
 // SecureCLIAgentCredential holds per-agent encrypted env overrides for a binary.
@@ -136,7 +139,9 @@ type SecureCLIAgentCredential struct {
 	// CredentialType selects the wire shape carried in EncryptedEnv.
 	CredentialType *string `json:"credential_type,omitempty" db:"credential_type"`
 	// HostScope binds the credential to a specific hostname.
-	HostScope *string `json:"host_scope,omitempty" db:"host_scope"`
+	HostScope   *string `json:"host_scope,omitempty" db:"host_scope"`
+	Label       string  `json:"label" db:"label"`
+	Description string  `json:"description" db:"description"`
 }
 
 // SecureCLIAgentGrant represents a per-agent grant with optional setting overrides.

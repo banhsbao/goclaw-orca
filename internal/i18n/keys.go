@@ -388,4 +388,8 @@ const (
 	MsgGitCredHostScopeInvalid         = "error.git_cred_host_scope_invalid"         // "host_scope %q is not a valid hostname"
 	MsgGitCredBlobMissingField         = "error.git_cred_blob_missing_field"         // "blob missing required field %q"
 	MsgGitCredUnsupportedCredType      = "error.git_cred_unsupported_cred_type"      // "credential_type %q is not supported"
+
+	MsgSecureCLILabelInvalid       = "error.secure_cli_label_invalid"
+	MsgSecureCLILabelLimit         = "error.secure_cli_label_limit"
+	MsgSecureCLIDescriptionTooLong = "error.secure_cli_description_too_long"
 )

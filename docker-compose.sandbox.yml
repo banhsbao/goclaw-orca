@@ -18,6 +18,7 @@ services:
         ENABLE_SANDBOX: "true"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker/goclaw-container-group:/etc/group:ro
     environment:
       - GOCLAW_SANDBOX_MODE=all
       - GOCLAW_SANDBOX_IMAGE=goclaw-sandbox:bookworm-slim

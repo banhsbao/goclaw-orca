@@ -408,7 +408,7 @@ func (s *SQLiteSecureCLIStore) LookupByBinary(ctx context.Context, binaryName st
 		query += ` LEFT JOIN secure_cli_agent_grants g ON 0`
 	}
 	if agentID != nil {
-		query += ` LEFT JOIN secure_cli_agent_credentials ac ON ac.binary_id = b.id AND ac.agent_id = ?`
+		query += ` LEFT JOIN secure_cli_agent_credentials ac ON ac.binary_id = b.id AND ac.agent_id = ? AND ac.label = ''`
 		args = append(args, *agentID)
 		if !isCross {
 			query += ` AND ac.tenant_id = ?`
@@ -419,10 +419,10 @@ func (s *SQLiteSecureCLIStore) LookupByBinary(ctx context.Context, binaryName st
 	// LEFT JOIN user credentials (only when we project uc_user.*)
 	if hasUserJoin || hasUserJoinNoAgent {
 		if isCross {
-			query += ` LEFT JOIN secure_cli_user_credentials uc_user ON uc_user.binary_id = b.id AND uc_user.user_id = ?`
+			query += ` LEFT JOIN secure_cli_user_credentials uc_user ON uc_user.binary_id = b.id AND uc_user.user_id = ? AND uc_user.label = ''`
 			args = append(args, userID)
 		} else {
-			query += ` LEFT JOIN secure_cli_user_credentials uc_user ON uc_user.binary_id = b.id AND uc_user.user_id = ? AND uc_user.tenant_id = ?`
+			query += ` LEFT JOIN secure_cli_user_credentials uc_user ON uc_user.binary_id = b.id AND uc_user.user_id = ? AND uc_user.label = '' AND uc_user.tenant_id = ?`
 			args = append(args, userID, tid)
 		}
 	}

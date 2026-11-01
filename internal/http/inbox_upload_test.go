@@ -86,3 +86,28 @@ func TestInboxUpload_RejectsUnsafeNames(t *testing.T) {
 		t.Fatal("file escaped ticket dir")
 	}
 }
+
+func TestInboxUpload_PreflightAllowsBrowserUpload(t *testing.T) {
+	_, mux, _ := newInboxTestServer(t)
+	req := httptest.NewRequest(http.MethodOptions, "/v1/inbox/any/shot.png", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if rec.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatal("missing allow-origin")
+	}
+	if !strings.Contains(rec.Header().Get("Access-Control-Allow-Methods"), "PUT") {
+		t.Fatal("PUT not allowed")
+	}
+}
+
+func TestInboxUpload_PutResponseCarriesCORS(t *testing.T) {
+	store, mux, dir := newInboxTestServer(t)
+	id, _, _ := store.Issue(dir, time.Minute, 1)
+	rec := putInbox(mux, id, "shot.png", "x")
+	if rec.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatal("missing allow-origin on PUT")
+	}
+}

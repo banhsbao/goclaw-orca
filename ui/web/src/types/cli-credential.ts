@@ -128,12 +128,15 @@ export interface CLIAgentCredential {
   env?: Record<string, CLIEnvEntryResponse>;
   credential_type?: CLIGitCredentialType | string | null;
   host_scope?: string | null;
+  label: string;
+  description: string;
   created_by?: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface CLIAgentCredentialInput {
+  description?: string;
   env?: CLIEnvPayload;
   credential_type?: Exclude<CLIGitCredentialType, "env">;
   host_scope?: string;

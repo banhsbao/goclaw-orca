@@ -62,14 +62,47 @@ covers the gateway process).
 3. Grant the binary to the agents that should use it.
 
 The preset blocks commands that would retarget or leak the connection or touch the Orca
-machine's desktop: leading flags (put the subcommand first), `--pairing-code`,
-`--environment`, `serve`, `open`, `environment`, `account`, `computer`, `diagnostics`,
+machine's desktop: leading flags other than the gateway-handled `--server` selector (put the
+subcommand first), `--pairing-code`,
+`--environment`, `serve`, `open`, `environment`, `account` (except `account list`), `computer`, `diagnostics`,
 `skills install|update|share`, and `orchestration reset`.
+
+### Multiple Orca machines
+
+Use one credential per machine. In the CLI Credentials dialog (agent or user credential),
+set:
+
+| Field | Rule |
+|-------|------|
+| Label | Lowercase letters, digits, `-`, `_`; 1-32 characters. `default` is reserved for the unlabeled credential. |
+| Description | Up to 200 characters. Non-secret; agents see it to pick a machine. |
+
+The label cannot be changed after creation; delete and recreate the credential to rename it.
+Max 20 labeled credentials per user or per agent per binary.
+
+The agent selects a machine per command with `--server <label>` as the first argument:
+
+```bash
+orca --server build-vm status --json
+```
+
+| Situation | Result |
+|-----------|--------|
+| `--server <label>` | User credential with that label, else agent credential with that label |
+| `--server <unknown>` | Error; the label is echoed truncated |
+| No `--server`, default credential exists | Default credential, as before |
+| No `--server`, no default, one label | That label is used |
+| No `--server`, no default, several labels | Error listing each label and description; re-run with `--server <label>` |
+
+The labels and descriptions also appear in the `Servers` block of the `Credentialed CLI Tools`
+section of the agent's TOOLS.md. Credentials created from the `orca` preset before this change
+keep their stored tip text; the servers block explains `--server` on its own.
 
 ## 4. Verify
 
 Ask the agent to run `orca status --json`. `runtime.state` should be `ready` and
-`target.environment` should be `pairing-code`. The bundled `orca-cli` skill covers the
+`target.environment` should be `pairing-code`. With several machines, run
+`orca --server <label> status --json` for each label. The bundled `orca-cli` skill covers the
 remaining commands.
 
 ## 5. Getting files back

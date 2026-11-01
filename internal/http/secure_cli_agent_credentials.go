@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 
 	"github.com/google/uuid"
 
@@ -21,6 +22,8 @@ type agentCredentialEntry struct {
 	Env            map[string]store.SecureCLIEnvResponseEntry `json:"env,omitempty"`
 	CredentialType *string                                    `json:"credential_type,omitempty"`
 	HostScope      *string                                    `json:"host_scope,omitempty"`
+	Label          string                                     `json:"label"`
+	Description    string                                     `json:"description"`
 	CreatedBy      string                                     `json:"created_by,omitempty"`
 	CreatedAt      string                                     `json:"created_at"`
 	UpdatedAt      string                                     `json:"updated_at"`
@@ -50,6 +53,8 @@ func agentCredentialResponse(c store.SecureCLIAgentCredential) agentCredentialEn
 		HasSecret:      len(c.EncryptedEnv) > 0,
 		CredentialType: c.CredentialType,
 		HostScope:      c.HostScope,
+		Label:          c.Label,
+		Description:    c.Description,
 		CreatedBy:      c.CreatedBy,
 		CreatedAt:      c.CreatedAt,
 		UpdatedAt:      c.UpdatedAt,
@@ -98,6 +103,12 @@ func (h *SecureCLIHandler) handleListAgentCredentials(w http.ResponseWriter, r *
 	for _, c := range creds {
 		entries = append(entries, agentCredentialResponse(c))
 	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if entries[i].AgentID != entries[j].AgentID {
+			return entries[i].AgentID.String() < entries[j].AgentID.String()
+		}
+		return entries[i].Label < entries[j].Label
+	})
 	writeJSON(w, http.StatusOK, map[string]any{"agent_credentials": entries})
 }
 
@@ -114,7 +125,21 @@ func (h *SecureCLIHandler) handleGetAgentCredentials(w http.ResponseWriter, r *h
 	if !ok {
 		return
 	}
-	cred, err := agentCreds.GetAgentCredentials(r.Context(), binaryID, agentID)
+	label, ok := parseCredentialLabelParam(w, r, locale)
+	if !ok {
+		return
+	}
+	var cred *store.SecureCLIAgentCredential
+	var err error
+	if label == "" {
+		cred, err = agentCreds.GetAgentCredentials(r.Context(), binaryID, agentID)
+	} else {
+		ls, lok := h.requireLabeledCredentialStore(w, locale)
+		if !lok {
+			return
+		}
+		cred, err = ls.GetAgentCredentialByLabel(r.Context(), binaryID, agentID, label)
+	}
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": i18n.T(locale, i18n.MsgInternalError, err.Error())})
 		return
@@ -153,12 +178,21 @@ func (h *SecureCLIHandler) handleSetAgentCredentials(w http.ResponseWriter, r *h
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": i18n.T(locale, i18n.MsgNotFound, "agent", agentID.String())})
 		return
 	}
+	label, ok := parseCredentialLabelParam(w, r, locale)
+	if !ok {
+		return
+	}
 
 	var body struct {
-		Env json.RawMessage `json:"env"`
+		Env         json.RawMessage `json:"env"`
+		Description *string         `json:"description"`
 		typedCredentialBody
 	}
 	if !bindJSON(w, r, locale, &body) {
+		return
+	}
+	description, ok := validateCredentialDescription(w, locale, body.Description)
+	if !ok {
 		return
 	}
 	envBytes, credType, hostScope, terr := prepareTypedCredentialEnv(r.Context(), locale, body.typedCredentialBody)
@@ -167,24 +201,85 @@ func (h *SecureCLIHandler) handleSetAgentCredentials(w http.ResponseWriter, r *h
 		return
 	}
 	createdBy := store.UserIDFromContext(r.Context())
-	if envBytes != nil {
-		if err := agentCreds.SetAgentCredentialsTyped(r.Context(), binaryID, agentID, envBytes, credType, hostScope, createdBy); err != nil {
+
+	labeled := label != "" || description != nil
+	var ls store.SecureCLILabeledCredentialStore
+	var existing *store.SecureCLIAgentCredential
+	var err error
+	if labeled {
+		ls, ok = h.requireLabeledCredentialStore(w, locale)
+		if !ok {
+			return
+		}
+		existing, err = h.getAgentCredentialForWrite(r, agentCreds, ls, binaryID, agentID, label)
+		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": i18n.T(locale, i18n.MsgInternalError, err.Error())})
 			return
 		}
-		emitAudit(h.msgBus, r, "secure_cli.agent_credentials.updated", "secure_cli_agent_credentials", binaryID.String()+"/"+agentID.String()+"#"+*credType)
+		if label != "" && existing == nil {
+			atCap, cerr := h.agentLabelLimitReached(r, agentCreds, binaryID, agentID)
+			if cerr != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": i18n.T(locale, i18n.MsgInternalError, cerr.Error())})
+				return
+			}
+			if atCap {
+				writeCredentialLabelLimit(w, locale)
+				return
+			}
+		}
+	}
+
+	write := store.SecureCLICredentialWrite{Label: label}
+	if description != nil {
+		write.Description = *description
+	} else if existing != nil {
+		write.Description = existing.Description
+	}
+	auditID := binaryID.String() + "/" + agentID.String() + credentialAuditSuffix(label)
+
+	if envBytes != nil {
+		if labeled {
+			write.Env, write.CredentialType, write.HostScope = envBytes, credType, hostScope
+			err = ls.SetAgentCredentialLabeled(r.Context(), binaryID, agentID, write, createdBy)
+		} else {
+			err = agentCreds.SetAgentCredentialsTyped(r.Context(), binaryID, agentID, envBytes, credType, hostScope, createdBy)
+		}
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": i18n.T(locale, i18n.MsgInternalError, err.Error())})
+			return
+		}
+		emitAudit(h.msgBus, r, "secure_cli.agent_credentials.updated", "secure_cli_agent_credentials", auditID+"#"+*credType)
 		h.emitCacheInvalidate("")
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
+
 	if len(body.Env) == 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": i18n.T(locale, i18n.MsgRequired, "env")})
+		if !labeled || existing == nil || description == nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": i18n.T(locale, i18n.MsgRequired, "env")})
+			return
+		}
+		if len(existing.EncryptedEnv) == 0 {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": i18n.T(locale, i18n.MsgInternalError, "stored credential is unreadable; re-enter the secret")})
+			return
+		}
+		write.Env, write.CredentialType, write.HostScope = existing.EncryptedEnv, existing.CredentialType, existing.HostScope
+		if err := ls.SetAgentCredentialLabeled(r.Context(), binaryID, agentID, write, createdBy); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": i18n.T(locale, i18n.MsgInternalError, err.Error())})
+			return
+		}
+		emitAudit(h.msgBus, r, "secure_cli.agent_credentials.updated", "secure_cli_agent_credentials", auditID)
+		h.emitCacheInvalidate("")
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		return
 	}
-	existing, err := agentCreds.GetAgentCredentials(r.Context(), binaryID, agentID)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": i18n.T(locale, i18n.MsgInternalError, err.Error())})
-		return
+
+	if !labeled {
+		existing, err = agentCreds.GetAgentCredentials(r.Context(), binaryID, agentID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": i18n.T(locale, i18n.MsgInternalError, err.Error())})
+			return
+		}
 	}
 	var existingEnv []byte
 	if existing != nil {
@@ -199,13 +294,40 @@ func (h *SecureCLIHandler) handleSetAgentCredentials(w http.ResponseWriter, r *h
 	if !ok {
 		return
 	}
-	if err := agentCreds.SetAgentCredentials(r.Context(), binaryID, agentID, envJSON, createdBy); err != nil {
+	if labeled {
+		write.Env = envJSON
+		err = ls.SetAgentCredentialLabeled(r.Context(), binaryID, agentID, write, createdBy)
+	} else {
+		err = agentCreds.SetAgentCredentials(r.Context(), binaryID, agentID, envJSON, createdBy)
+	}
+	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": i18n.T(locale, i18n.MsgInternalError, err.Error())})
 		return
 	}
-	emitAudit(h.msgBus, r, "secure_cli.agent_credentials.updated", "secure_cli_agent_credentials", binaryID.String()+"/"+agentID.String())
+	emitAudit(h.msgBus, r, "secure_cli.agent_credentials.updated", "secure_cli_agent_credentials", auditID)
 	h.emitCacheInvalidate("")
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *SecureCLIHandler) getAgentCredentialForWrite(r *http.Request, agentCreds store.SecureCLIAgentCredentialStore, ls store.SecureCLILabeledCredentialStore, binaryID, agentID uuid.UUID, label string) (*store.SecureCLIAgentCredential, error) {
+	if label == "" {
+		return agentCreds.GetAgentCredentials(r.Context(), binaryID, agentID)
+	}
+	return ls.GetAgentCredentialByLabel(r.Context(), binaryID, agentID, label)
+}
+
+func (h *SecureCLIHandler) agentLabelLimitReached(r *http.Request, agentCreds store.SecureCLIAgentCredentialStore, binaryID, agentID uuid.UUID) (bool, error) {
+	creds, err := agentCreds.ListAgentCredentials(r.Context(), binaryID)
+	if err != nil {
+		return false, err
+	}
+	count := 0
+	for _, c := range creds {
+		if c.AgentID == agentID && c.Label != "" {
+			count++
+		}
+	}
+	return count >= maxSecureCLICredentialLabels, nil
 }
 
 func (h *SecureCLIHandler) handleDeleteAgentCredentials(w http.ResponseWriter, r *http.Request) {
@@ -221,11 +343,25 @@ func (h *SecureCLIHandler) handleDeleteAgentCredentials(w http.ResponseWriter, r
 	if !ok {
 		return
 	}
-	if err := agentCreds.DeleteAgentCredentials(r.Context(), binaryID, agentID); err != nil {
+	label, ok := parseCredentialLabelParam(w, r, locale)
+	if !ok {
+		return
+	}
+	var err error
+	if label == "" {
+		err = agentCreds.DeleteAgentCredentials(r.Context(), binaryID, agentID)
+	} else {
+		ls, lok := h.requireLabeledCredentialStore(w, locale)
+		if !lok {
+			return
+		}
+		err = ls.DeleteAgentCredentialByLabel(r.Context(), binaryID, agentID, label)
+	}
+	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": i18n.T(locale, i18n.MsgInternalError, err.Error())})
 		return
 	}
-	emitAudit(h.msgBus, r, "secure_cli.agent_credentials.deleted", "secure_cli_agent_credentials", binaryID.String()+"/"+agentID.String())
+	emitAudit(h.msgBus, r, "secure_cli.agent_credentials.deleted", "secure_cli_agent_credentials", binaryID.String()+"/"+agentID.String()+credentialAuditSuffix(label))
 	h.emitCacheInvalidate("")
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

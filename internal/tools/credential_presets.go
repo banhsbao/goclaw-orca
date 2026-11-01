@@ -148,13 +148,14 @@ var CLIPresets = map[string]CLIPreset{
 		DenyArgs: []string{
 			`^-`,
 			`(^|\s)--(pairing-code|environment)\b`,
-			`^(serve|open|environment|account|computer|diagnostics)\b`,
+			`^(serve|open|environment|computer|diagnostics)\b`,
+			`^account(\s*$|\s+([^l\s]|l[^i\s]|li[^s\s]|lis[^t\s]|list\S))`,
 			`^skills\s+(install|update|share)\b`,
 			`^orchestration\s+reset\b`,
 		},
 		DenyVerbose: nil,
 		Timeout:     120,
-		Tips:        "Start every session with `orca status --json`. Put the subcommand first and always pass --json. The paired runtime is fixed by the credential; do not pass --pairing-code or --environment.",
+		Tips:        "Start every session with `orca status --json`. Put the subcommand first and always pass --json. When the tools section lists several servers, pick one with `orca --server <label> <subcommand> --json` (--server must be the first argument); otherwise the paired runtime is fixed by the credential. Never pass --pairing-code or --environment.",
 	},
 	"rapidapi": {
 		BinaryName:  "rapidapi",

@@ -4,6 +4,26 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ---
 
+## 2026-11-01
+
+### Labeled Secure CLI credentials
+
+**Features**
+
+- Agent and user CLI credentials can carry a `label` and `description`, so one binary can target several remote machines. The unlabeled credential is the default. Agents select a machine with `orca --server <label> <subcommand> --json`.
+- Up to 20 labels per subject per binary. Labels are lowercase `[a-z0-9_-]`, max 32 characters; `default` is reserved.
+- HTTP: `?label=` on the agent and user credential item routes; optional `description` on PUT; list entries include `label` and `description`.
+- Web UI: label and description fields in the credential dialogs (label fixed after creation) and a label badge on rows.
+- Agent prompts list configured servers in the `Credentialed CLI Tools` section. Without `--server` and without a default, one label is used automatically; several labels return an error that lists them.
+- The `orca` preset tip explains `--server`. Credentials created earlier keep their stored tip.
+
+**Changes**
+
+- User-credential routes (`/v1/cli-credentials/{id}/user-credentials/...`) now require tenant owner or admin membership, the same guard as agent credentials. Non-member admins get `403`; requests without tenant context get `400`.
+- Schema: PostgreSQL migration `000100` and SQLite schema 61 add the label columns and widen the unique keys. Rolling back the PostgreSQL migration deletes labeled rows.
+
+---
+
 ## 2026-10-30
 
 ### Telegram media delivery fixes

@@ -16,7 +16,7 @@ var schemaSQL string
 
 // SchemaVersion is the current SQLite schema version.
 // Bump this when adding new migration steps below.
-const SchemaVersion = 60
+const SchemaVersion = 61
 
 // migrations maps version → SQL to apply when upgrading FROM that version.
 // schema.sql always represents the LATEST full schema (for fresh DBs).
@@ -95,6 +95,7 @@ BEGIN
 END;`
 
 var migrations = map[int]string{
+	60: sqliteSecureCLICredentialLabelsMigration,
 	// Version 59 → 60: keep an append-only copy of group capture. Pending rows are
 	// deleted when the buffer is handed to the agent and when compaction replaces
 	// them with a summary; before this table those deletes destroyed the only copy.
@@ -1826,3 +1827,55 @@ func seedMasterTenant(db *sql.DB) error {
 	}
 	return nil
 }
+
+const sqliteSecureCLICredentialLabelsMigration = `CREATE TABLE secure_cli_user_credentials_new (
+    id              TEXT NOT NULL PRIMARY KEY,
+    binary_id       TEXT NOT NULL REFERENCES secure_cli_binaries(id) ON DELETE CASCADE,
+    user_id         VARCHAR(255) NOT NULL,
+    encrypted_env   BLOB NOT NULL,
+    metadata        TEXT NOT NULL DEFAULT '{}',
+    tenant_id       TEXT NOT NULL REFERENCES tenants(id),
+    credential_type TEXT,
+    host_scope      TEXT,
+    label           VARCHAR(32) NOT NULL DEFAULT '',
+    description     TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE(binary_id, user_id, tenant_id, label)
+);
+INSERT INTO secure_cli_user_credentials_new
+    (id, binary_id, user_id, encrypted_env, metadata, tenant_id, credential_type, host_scope, label, description, created_at, updated_at)
+    SELECT id, binary_id, user_id, encrypted_env, metadata, tenant_id, credential_type, host_scope, '', '', created_at, updated_at
+    FROM secure_cli_user_credentials;
+DROP TABLE secure_cli_user_credentials;
+ALTER TABLE secure_cli_user_credentials_new RENAME TO secure_cli_user_credentials;
+CREATE INDEX IF NOT EXISTS idx_scuc_tenant ON secure_cli_user_credentials(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_scuc_binary ON secure_cli_user_credentials(binary_id);
+CREATE INDEX IF NOT EXISTS idx_scuc_tenant_user ON secure_cli_user_credentials(tenant_id, user_id);
+CREATE TABLE secure_cli_agent_credentials_new (
+    id              TEXT NOT NULL PRIMARY KEY,
+    binary_id       TEXT NOT NULL,
+    agent_id        TEXT NOT NULL,
+    encrypted_env   BLOB NOT NULL,
+    metadata        TEXT NOT NULL DEFAULT '{}',
+    tenant_id       TEXT NOT NULL REFERENCES tenants(id),
+    credential_type TEXT,
+    host_scope      TEXT,
+    created_by      VARCHAR(255) NOT NULL DEFAULT '',
+    label           VARCHAR(32) NOT NULL DEFAULT '',
+    description     TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE(binary_id, agent_id, tenant_id, label),
+    FOREIGN KEY (binary_id, tenant_id) REFERENCES secure_cli_binaries(id, tenant_id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id, tenant_id) REFERENCES agents(id, tenant_id) ON DELETE CASCADE
+);
+INSERT INTO secure_cli_agent_credentials_new
+    (id, binary_id, agent_id, encrypted_env, metadata, tenant_id, credential_type, host_scope, created_by, label, description, created_at, updated_at)
+    SELECT id, binary_id, agent_id, encrypted_env, metadata, tenant_id, credential_type, host_scope, created_by, '', '', created_at, updated_at
+    FROM secure_cli_agent_credentials;
+DROP TABLE secure_cli_agent_credentials;
+ALTER TABLE secure_cli_agent_credentials_new RENAME TO secure_cli_agent_credentials;
+CREATE INDEX IF NOT EXISTS idx_scac_tenant ON secure_cli_agent_credentials(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_scac_binary ON secure_cli_agent_credentials(binary_id);
+CREATE INDEX IF NOT EXISTS idx_scac_agent ON secure_cli_agent_credentials(agent_id);`

@@ -1284,6 +1284,9 @@ typed token/key blobs.
 | `PUT` | `/v1/cli-credentials/{id}/agent-credentials/{agentId}` | Set agent credential |
 | `DELETE` | `/v1/cli-credentials/{id}/agent-credentials/{agentId}` | Delete agent credential |
 
+Each item route accepts `?label=<label>` to address a labeled credential. Omit it,
+or pass `default`, for the unlabeled default credential. See [Server Labels](#server-labels).
+
 Typed git request body:
 
 ```json
@@ -1309,12 +1312,95 @@ Env request body:
 Advanced personal overrides. These remain for backward compatibility and have
 higher runtime precedence than channel/context and agent credentials.
 
+These routes require tenant owner or admin membership in the request's tenant, the same
+guard as agent credentials. A non-member admin gets `403`; a request without tenant
+context gets `400`. System owners bypass the check.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/v1/cli-credentials/{id}/user-credentials` | List user credentials for CLI cred |
 | `GET` | `/v1/cli-credentials/{id}/user-credentials/{userId}` | Get user credential |
 | `PUT` | `/v1/cli-credentials/{id}/user-credentials/{userId}` | Set user credential |
 | `DELETE` | `/v1/cli-credentials/{id}/user-credentials/{userId}` | Delete user credential |
+
+All four routes accept `?label=<label>` (see [Server Labels](#server-labels)).
+
+### Server Labels
+
+Labels let one binary hold several credentials for the same subject, typically one per
+remote machine. The unlabeled row is the **default** credential.
+
+| Field | Rule |
+|-------|------|
+| `?label=` | Lowercased and trimmed. Must match `^[a-z0-9][a-z0-9_-]{0,31}$`. `default` addresses the unlabeled row. Invalid labels return `400`. |
+| `description` | Optional body field on `PUT`. Max 200 characters; control characters become spaces. Non-secret. Shown to agents in the prompt and in selection errors. |
+| Limit | Max 20 labeled rows per subject per binary. The default row is not counted. The 21st returns `400`. |
+| Rename | Not supported. The label is fixed at creation; delete and recreate to change it. |
+
+Description-only `PUT` (no `env` or typed body) updates the description of an existing row and
+keeps its secret. Against a missing row it returns `400`.
+
+```bash
+curl -X PUT "$GOCLAW/v1/cli-credentials/$BINARY_ID/agent-credentials/$AGENT_ID?label=build-vm" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"description":"Build VM runtime","env":{"ORCA_PAIRING_CODE":{"kind":"sensitive","value":"orca://pair?..."}}}'
+```
+
+List entries carry `label` and `description`. The default row has `label: ""`. Agent
+lists sort by `agent_id` then `label`; user lists sort by `user_id` then `label`.
+
+```json
+{
+  "agent_credentials": [
+    {
+      "id": "...",
+      "binary_id": "...",
+      "agent_id": "...",
+      "agent_key": "ops-bot",
+      "has_secret": true,
+      "env_keys": ["ORCA_PAIRING_CODE"],
+      "label": "build-vm",
+      "description": "Build VM runtime",
+      "created_by": "...",
+      "created_at": "...",
+      "updated_at": "..."
+    }
+  ]
+}
+```
+
+| Status | When |
+|--------|------|
+| `400` | `?label=` fails the pattern; `description` over 200 characters; 21st label; description-only `PUT` on a missing row (`env` required) |
+| `404` | `GET` with a `?label=` that has no row |
+| `501` | Non-empty `?label=`, or `description` on `PUT`, on a store without labeled-credential support |
+
+Audit resource id: `<binary_id>/<subject_id>@<label>`. The default row has no `@` suffix.
+
+#### Server selection at exec time
+
+An agent picks a server with `--server <label>` as the first argument, for example
+`orca --server build-vm status --json`. GoClaw strips the selector before deny checks and
+execution. See the [Orca remote CLI guide](./orca-remote-cli.md) for the operator setup.
+
+| Call | Result |
+|------|--------|
+| No `--server`, default row present | Default credential (user > context > agent, unchanged) |
+| No `--server`, no default, one label | That label |
+| No `--server`, no default, two or more labels | Error listing labels and descriptions |
+| No `--server`, no default, no labels | Legacy behavior (base/grant env only) |
+| `--server <label>` | User row with that label, else agent row with that label |
+| `--server default`, no default row | Unknown-server error |
+| `--server <unknown>` | Unknown-server error (label echoed, truncated) |
+
+- Only the first argument is consumed. A later `--server` goes to the binary unchanged. For
+  CLIs with their own `--server` flag (for example kubectl), the label picks the credential
+  but does not pin the target endpoint.
+- `--server` is recognized only when the binary has at least one labeled credential visible
+  to the agent and user. Otherwise the arguments pass through untouched.
+- A default row with no env, credential type, or host scope counts as no default.
+- The dry-run route `POST /v1/cli-credentials/{id}/test` does not strip `--server`. Omit the
+  selector in test commands.
 
 ### Agent Grants
 

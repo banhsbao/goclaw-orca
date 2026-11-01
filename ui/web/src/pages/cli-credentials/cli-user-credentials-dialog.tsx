@@ -18,6 +18,7 @@ import { useHttp } from "@/hooks/use-ws";
 import i18next from "i18next";
 import { CliCredentialEnvVarsSection, type ManualEnvEntry } from "./cli-credential-env-vars-section";
 import { CliCredentialGitFields, type GitCredentialType } from "./cli-credential-git-fields";
+import { CliCredentialLabelFields } from "./cli-credential-label-fields";
 import type { SecureCLIBinary } from "./hooks/use-cli-credentials";
 import type { CLIEnvEntryResponse, CLIEnvPayload } from "@/types/cli-credential";
 
@@ -31,6 +32,8 @@ interface UserCredEntry {
   /** Phase 5: typed-credential adapter routing. */
   credential_type?: string | null;
   host_scope?: string | null;
+  label: string;
+  description: string;
   created_at: string;
   updated_at: string;
 }
@@ -42,6 +45,11 @@ interface CLIUserCredentialsDialogProps {
 }
 
 type ViewState = "list" | "form";
+
+function userCredentialUrl(binaryId: string, userId: string, label: string) {
+  const base = `/v1/cli-credentials/${binaryId}/user-credentials/${encodeURIComponent(userId)}`;
+  return label ? `${base}?label=${encodeURIComponent(label)}` : base;
+}
 
 function entriesFromEnv(env: Record<string, CLIEnvEntryResponse> | null | undefined): ManualEnvEntry[] {
   if (!env || Object.keys(env).length === 0) return [];
@@ -74,6 +82,8 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
   const [userId, setUserId] = useState("");
   // Separate search text from selected value (onChange fires on every keystroke)
   const [userSearchText, setUserSearchText] = useState("");
+  const [label, setLabel] = useState("");
+  const [description, setDescription] = useState("");
   const [envEntries, setEnvEntries] = useState<ManualEnvEntry[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeletingId] = useState<string | null>(null);
@@ -110,6 +120,8 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
     setEditEntry(null);
     setUserId("");
     setUserSearchText("");
+    setLabel("");
+    setDescription("");
     setEnvEntries([]);
     setGitType(isGit ? "pat" : "env");
     setGitHostScope("");
@@ -124,6 +136,8 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
     setEditEntry(null);
     setUserId("");
     setUserSearchText("");
+    setLabel("");
+    setDescription("");
     setEnvEntries([]);
     setGitType(isGit ? "pat" : "env");
     setGitHostScope("");
@@ -138,6 +152,8 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
     setEditEntry(entry);
     setUserId(entry.user_id);
     setUserSearchText(entry.user_id);
+    setLabel(entry.label ?? "");
+    setDescription(entry.description ?? "");
     setEnvEntries([]);
     setGitErrorKey(undefined);
     setView("form");
@@ -151,7 +167,7 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
         credential_type?: string | null;
         host_scope?: string | null;
         has_secret?: boolean;
-      }>(`/v1/cli-credentials/${binary.id}/user-credentials/${entry.user_id}`);
+      }>(userCredentialUrl(binary.id, entry.user_id, entry.label ?? ""));
       setEnvEntries(entriesFromEnv(res.env));
       if (isGit) {
         const t = (res.credential_type ?? "env") as GitCredentialType;
@@ -201,9 +217,30 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
     return null;
   };
 
+  const saveBody = async (uid: string, lbl: string, body: object) => {
+    setSaving(true);
+    try {
+      await http.put(userCredentialUrl(binary.id, uid, lbl), body);
+      toast.success(i18next.t("cli-credentials:userCredentials.saved"));
+      await loadList();
+      setView("list");
+    } catch (err) {
+      toast.error(
+        i18next.t("cli-credentials:userCredentials.saveFailed"),
+        err instanceof Error ? err.message : "",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSave = async () => {
     const uid = userId.trim();
     if (!uid) return;
+    const lbl = label.trim();
+    const descriptionChanged = !!editEntry && description !== (editEntry.description ?? "");
+    const withDescription = <T extends object>(body: T) =>
+      editEntry || description.trim() ? { ...body, description } : body;
 
     setGitErrorKey(undefined);
 
@@ -214,6 +251,10 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
         // Client-side validation failure already set gitErrorKey above; bail
         // without toast so the inline field error is the single source of truth.
         if (payload === "no_change") {
+          if (descriptionChanged) {
+            await saveBody(uid, lbl, { description });
+            return;
+          }
           toast.success(i18next.t("cli-credentials:userCredentials.saved"));
           setView("list");
         }
@@ -222,7 +263,7 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
       if (payload === null) return;
       setSaving(true);
       try {
-        await http.put(`/v1/cli-credentials/${binary.id}/user-credentials/${uid}`, payload);
+        await http.put(userCredentialUrl(binary.id, uid, lbl), withDescription(payload));
         toast.success(i18next.t("cli-credentials:userCredentials.saved"));
         await loadList();
         setView("list");
@@ -253,7 +294,7 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
     }
     setSaving(true);
     try {
-      await http.put(`/v1/cli-credentials/${binary.id}/user-credentials/${uid}`, { env });
+      await http.put(userCredentialUrl(binary.id, uid, lbl), withDescription({ env }));
       toast.success(i18next.t("cli-credentials:userCredentials.saved"));
       await loadList();
       setView("list");
@@ -270,7 +311,7 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
   const handleDelete = async (entry: UserCredEntry) => {
     setDeletingId(entry.id);
     try {
-      await http.delete(`/v1/cli-credentials/${binary.id}/user-credentials/${entry.user_id}`);
+      await http.delete(userCredentialUrl(binary.id, entry.user_id, entry.label ?? ""));
       toast.success(i18next.t("cli-credentials:userCredentials.deleted"));
       await loadList();
     } catch (err) {
@@ -316,6 +357,9 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
                     <div className="flex flex-col gap-1 min-w-0">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="font-mono text-sm truncate">{entry.user_id}</span>
+                        {entry.label ? (
+                          <Badge variant="outline" className="shrink-0 font-mono text-xs">{entry.label}</Badge>
+                        ) : null}
                         {entry.credential_type && entry.credential_type !== "env" ? (
                           <Badge variant="default" className="shrink-0 text-xs uppercase">
                             {entry.credential_type === "pat"
@@ -330,6 +374,9 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
                           </Badge>
                         ) : null}
                       </div>
+                      {entry.description ? (
+                        <p className="text-xs text-muted-foreground truncate" title={entry.description}>{entry.description}</p>
+                      ) : null}
                       {entry.host_scope && (
                         <p className="text-xs text-muted-foreground font-mono truncate" title={entry.host_scope}>
                           {entry.host_scope}
@@ -395,6 +442,14 @@ export function CLIUserCredentialsDialog({ open, onOpenChange, binary }: CLIUser
                 />
                 <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-md px-2.5 py-1.5 border border-amber-200 dark:border-amber-800">{t("userCredentials.mergeHint")}</p>
               </div>
+
+              <CliCredentialLabelFields
+                label={label}
+                onLabelChange={setLabel}
+                description={description}
+                onDescriptionChange={setDescription}
+                labelLocked={!!editEntry}
+              />
 
               {isGit ? (
                 <CliCredentialGitFields

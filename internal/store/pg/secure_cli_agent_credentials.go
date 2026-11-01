@@ -14,7 +14,7 @@ import (
 )
 
 const agentCredSelectCols = `c.id, c.binary_id, c.agent_id, c.encrypted_env, c.metadata,
-	 c.credential_type, c.host_scope, c.created_by, c.created_at, c.updated_at`
+	 c.credential_type, c.host_scope, c.created_by, c.created_at, c.updated_at, c.label, c.description`
 
 func agentCredentialTenantID(ctx context.Context) (uuid.UUID, error) {
 	tid := store.TenantIDFromContext(ctx)
@@ -51,6 +51,10 @@ func (s *PGSecureCLIStore) AgentExists(ctx context.Context, agentID uuid.UUID) (
 }
 
 func (s *PGSecureCLIStore) GetAgentCredentials(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID) (*store.SecureCLIAgentCredential, error) {
+	return s.getAgentCredential(ctx, binaryID, agentID, "")
+}
+
+func (s *PGSecureCLIStore) getAgentCredential(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID, label string) (*store.SecureCLIAgentCredential, error) {
 	tid, err := agentCredentialTenantID(ctx)
 	if err != nil {
 		return nil, err
@@ -61,10 +65,10 @@ func (s *PGSecureCLIStore) GetAgentCredentials(ctx context.Context, binaryID uui
 		`SELECT `+agentCredSelectCols+`, COALESCE(a.agent_key, ''), COALESCE(a.display_name, '')
 		 FROM secure_cli_agent_credentials c
 		 LEFT JOIN agents a ON a.id = c.agent_id AND a.tenant_id = c.tenant_id
-		 WHERE c.binary_id = $1 AND c.agent_id = $2 AND c.tenant_id = $3`,
-		binaryID, agentID, tid,
+		 WHERE c.binary_id = $1 AND c.agent_id = $2 AND c.tenant_id = $3 AND c.label = $4`,
+		binaryID, agentID, tid, label,
 	).Scan(&c.ID, &c.BinaryID, &c.AgentID, &env, &c.Metadata,
-		&c.CredentialType, &c.HostScope, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt,
+		&c.CredentialType, &c.HostScope, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt, &c.Label, &c.Description,
 		&c.AgentKey, &c.Name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -81,6 +85,10 @@ func (s *PGSecureCLIStore) SetAgentCredentials(ctx context.Context, binaryID uui
 }
 
 func (s *PGSecureCLIStore) SetAgentCredentialsTyped(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID, encryptedEnv []byte, credentialType, hostScope *string, createdBy string) error {
+	return s.setAgentCredential(ctx, binaryID, agentID, "", nil, encryptedEnv, credentialType, hostScope, createdBy)
+}
+
+func (s *PGSecureCLIStore) setAgentCredential(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID, label string, description *string, encryptedEnv []byte, credentialType, hostScope *string, createdBy string) error {
 	tid, err := agentCredentialTenantID(ctx)
 	if err != nil {
 		return err
@@ -93,18 +101,19 @@ func (s *PGSecureCLIStore) SetAgentCredentialsTyped(ctx context.Context, binaryI
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO secure_cli_agent_credentials
 		   (binary_id, agent_id, encrypted_env, metadata, tenant_id,
-		    credential_type, host_scope, created_by, created_at, updated_at)
-		 SELECT b.id, a.id, $3, '{}', $4, $5, $6, $7, $8, $8
+		    credential_type, host_scope, created_by, label, description, created_at, updated_at)
+		 SELECT b.id, a.id, $3, '{}', $4, $5, $6, $7, $9, COALESCE($10::text, ''), $8, $8
 		 FROM secure_cli_binaries b
 		 JOIN agents a ON a.id = $2 AND a.tenant_id = $4 AND a.deleted_at IS NULL
 		 WHERE b.id = $1 AND b.tenant_id = $4
-		 ON CONFLICT (binary_id, agent_id, tenant_id) DO UPDATE SET
+		 ON CONFLICT (binary_id, agent_id, tenant_id, label) DO UPDATE SET
 		   encrypted_env   = EXCLUDED.encrypted_env,
 		   credential_type = EXCLUDED.credential_type,
 		   host_scope      = EXCLUDED.host_scope,
 		   created_by      = EXCLUDED.created_by,
+		   description     = COALESCE($10::text, secure_cli_agent_credentials.description),
 		   updated_at      = EXCLUDED.updated_at`,
-		binaryID, agentID, envBytes, tid, credentialType, hostScope, createdBy, now,
+		binaryID, agentID, envBytes, tid, credentialType, hostScope, createdBy, now, label, description,
 	)
 	if err != nil {
 		return err
@@ -116,13 +125,17 @@ func (s *PGSecureCLIStore) SetAgentCredentialsTyped(ctx context.Context, binaryI
 }
 
 func (s *PGSecureCLIStore) DeleteAgentCredentials(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID) error {
+	return s.deleteAgentCredential(ctx, binaryID, agentID, "")
+}
+
+func (s *PGSecureCLIStore) deleteAgentCredential(ctx context.Context, binaryID uuid.UUID, agentID uuid.UUID, label string) error {
 	tid, err := agentCredentialTenantID(ctx)
 	if err != nil {
 		return err
 	}
 	_, err = s.db.ExecContext(ctx,
-		`DELETE FROM secure_cli_agent_credentials WHERE binary_id = $1 AND agent_id = $2 AND tenant_id = $3`,
-		binaryID, agentID, tid,
+		`DELETE FROM secure_cli_agent_credentials WHERE binary_id = $1 AND agent_id = $2 AND tenant_id = $3 AND label = $4`,
+		binaryID, agentID, tid, label,
 	)
 	return err
 }
@@ -137,7 +150,7 @@ func (s *PGSecureCLIStore) ListAgentCredentials(ctx context.Context, binaryID uu
 		 FROM secure_cli_agent_credentials c
 		 LEFT JOIN agents a ON a.id = c.agent_id AND a.tenant_id = c.tenant_id
 		 WHERE c.binary_id = $1 AND c.tenant_id = $2
-		 ORDER BY c.created_at`, binaryID, tid)
+		 ORDER BY c.label, c.created_at`, binaryID, tid)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +161,7 @@ func (s *PGSecureCLIStore) ListAgentCredentials(ctx context.Context, binaryID uu
 		var c store.SecureCLIAgentCredential
 		var env []byte
 		if err := rows.Scan(&c.ID, &c.BinaryID, &c.AgentID, &env, &c.Metadata,
-			&c.CredentialType, &c.HostScope, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt,
+			&c.CredentialType, &c.HostScope, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt, &c.Label, &c.Description,
 			&c.AgentKey, &c.Name); err != nil {
 			return nil, err
 		}

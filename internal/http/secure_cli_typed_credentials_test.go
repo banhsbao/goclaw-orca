@@ -127,7 +127,7 @@ func putUserCred(t *testing.T, h *SecureCLIHandler, binaryID uuid.UUID, body any
 	req.SetPathValue("id", binaryID.String())
 	req.SetPathValue("userId", "u1")
 	rec := httptest.NewRecorder()
-	h.handleSetUserCredentials(rec, req)
+	h.handleSetUserCredentials(rec, withTenantAdminContext(req))
 	return rec
 }
 
@@ -145,7 +145,7 @@ func putAgentCred(t *testing.T, h *SecureCLIHandler, binaryID, agentID uuid.UUID
 // 9. Handler accepts new PAT payload and routes through SetUserCredentialsTyped.
 func TestPutUserCredential_PATPayload(t *testing.T) {
 	st := &recordingSecureCLIStore{}
-	h := NewSecureCLIHandler(st, nil)
+	h := newAgentCredentialTestHandler(st)
 	binaryID := uuid.New()
 
 	rec := putUserCred(t, h, binaryID, map[string]any{
@@ -351,7 +351,7 @@ func TestAgentCredentialsRouteRequiresTenantAdmin(t *testing.T) {
 // 10. Handler rejects passphrase-protected SSH key with error_key.
 func TestPutUserCredential_RejectsPassphraseKey(t *testing.T) {
 	st := &recordingSecureCLIStore{}
-	h := NewSecureCLIHandler(st, nil)
+	h := newAgentCredentialTestHandler(st)
 	binaryID := uuid.New()
 
 	pem := genPassphrasePEM(t, "topsecret")
@@ -378,7 +378,7 @@ func TestPutUserCredential_RejectsPassphraseKey(t *testing.T) {
 // 11. Handler rejects PAT/SSH payload missing host_scope.
 func TestPutUserCredential_PATNoHostScope(t *testing.T) {
 	st := &recordingSecureCLIStore{}
-	h := NewSecureCLIHandler(st, nil)
+	h := newAgentCredentialTestHandler(st)
 	binaryID := uuid.New()
 
 	rec := putUserCred(t, h, binaryID, map[string]any{
@@ -401,7 +401,7 @@ func TestPutUserCredential_PATNoHostScope(t *testing.T) {
 // 12. Legacy env-paste body keeps the legacy code path unchanged.
 func TestPutUserCredential_LegacyEnvUnchanged(t *testing.T) {
 	st := &recordingSecureCLIStore{}
-	h := NewSecureCLIHandler(st, nil)
+	h := newAgentCredentialTestHandler(st)
 	binaryID := uuid.New()
 
 	rec := putUserCred(t, h, binaryID, map[string]any{
@@ -420,7 +420,7 @@ func TestPutUserCredential_LegacyEnvUnchanged(t *testing.T) {
 // since the validator already runs on the normalized bytes.
 func TestPutUserCredential_SSHKeyCRLFNormalized(t *testing.T) {
 	st := &recordingSecureCLIStore{}
-	h := NewSecureCLIHandler(st, nil)
+	h := newAgentCredentialTestHandler(st)
 	binaryID := uuid.New()
 
 	pem := genUnencryptedPEM(t)

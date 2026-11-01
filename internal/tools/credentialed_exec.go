@@ -374,6 +374,11 @@ func (t *ExecTool) executeCredentialed(ctx context.Context, cred *store.SecureCL
 		return credentialedShellOperatorError(rawCommand, ops)
 	}
 
+	cred, args, selectErr := t.selectCredentialedServer(ctx, cred, binary, args)
+	if selectErr != nil {
+		return selectErr
+	}
+
 	// Step 2: Per-binary deny check (deny_args)
 	denyArgs, allowAudits := applyCommandKeywordAllowlist(binary, args, t.commandKeywordAllowlistSnapshot())
 	if p := matchesBinaryDeny(denyArgs, cred.DenyArgs); p != "" {
@@ -696,7 +701,7 @@ func (t *ExecTool) executeCredentialedHost(ctx context.Context, absPath string, 
 
 	select {
 	case err := <-done:
-		return formatCredentialedResult(absPath, args, stdout.String(), stderr.String(), err, ctx, timeout)
+		return formatCredentialedResult(absPath, args, t.extractCredentialedMedia(ctx, stdout.String()), stderr.String(), err, ctx, timeout)
 
 	case <-ctx.Done():
 		_ = killProcessGroup(cmd, syscallSIGTERM)
@@ -741,7 +746,7 @@ func (t *ExecTool) executeCredentialedSandbox(ctx context.Context, absPath strin
 		return ErrorResult(fmt.Sprintf("credentialed sandbox exec: %v", err))
 	}
 
-	output := result.Stdout
+	output := t.extractCredentialedMedia(ctx, result.Stdout)
 	if result.Stderr != "" {
 		if output != "" {
 			output += "\n"

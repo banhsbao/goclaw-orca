@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/nextlevelbuilder/goclaw/internal/store"
@@ -40,6 +41,7 @@ func GenerateCredentialContext(creds []store.SecureCLIBinary) string {
 		if c.Tips != "" {
 			b.WriteString(fmt.Sprintf("  Tip: %s\n", c.Tips))
 		}
+		writeCredentialServers(&b, c.CredentialLabels)
 		b.WriteString("\n")
 		if c.AdapterName != nil && *c.AdapterName == "git" {
 			hasGit = true
@@ -64,6 +66,53 @@ func GenerateCredentialContext(creds []store.SecureCLIBinary) string {
 	b.WriteString("Tell the user: \"This credentialed CLI operation is blocked by policy and may require admin approval.\"\n")
 	b.WriteString("Do NOT attempt workarounds to bypass blocked credentialed CLI commands.\n")
 	return b.String()
+}
+
+const maxCredentialServersPerBinary = 20
+
+func sanitizeServerDescription(s string) string {
+	s = store.SanitizeSecureCLICredentialDescription(s)
+	s = strings.ReplaceAll(s, "`", "'")
+	return strings.Join(strings.Fields(s), " ")
+}
+
+func writeCredentialServers(b *strings.Builder, labels []store.SecureCLICredentialLabel) {
+	hasLabeled := false
+	var def *store.SecureCLICredentialLabel
+	named := make([]store.SecureCLICredentialLabel, 0, len(labels))
+	for i := range labels {
+		if labels[i].Label == "" {
+			def = &labels[i]
+			continue
+		}
+		hasLabeled = true
+		named = append(named, labels[i])
+	}
+	if !hasLabeled {
+		return
+	}
+	sort.SliceStable(named, func(i, j int) bool { return named[i].Label < named[j].Label })
+	if len(named) > maxCredentialServersPerBinary {
+		named = named[:maxCredentialServersPerBinary]
+	}
+
+	b.WriteString("  Servers (pass `--server <label>` as the FIRST argument, e.g. `orca --server build-vm status --json`):\n")
+	if def != nil {
+		desc := sanitizeServerDescription(def.Description)
+		if desc == "" {
+			desc = "used when --server is omitted"
+		}
+		fmt.Fprintf(b, "  - default — %s\n", desc)
+	}
+	for _, l := range named {
+		desc := sanitizeServerDescription(l.Description)
+		if desc == "" {
+			fmt.Fprintf(b, "  - %s\n", l.Label)
+			continue
+		}
+		fmt.Fprintf(b, "  - %s — %s\n", l.Label, desc)
+	}
+	b.WriteString("  Omitting --server uses the default; with no default and several servers the call fails and lists labels.\n")
 }
 
 // summarizeDenyPatterns converts regex deny patterns to a human-readable summary.

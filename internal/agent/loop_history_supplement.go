@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
 	"github.com/google/uuid"
@@ -36,7 +37,32 @@ func (l *Loop) buildCredentialCLIContext(ctx context.Context) string {
 	if err != nil || len(creds) == 0 {
 		return ""
 	}
+	l.attachCredentialLabels(ctx, creds)
 	return tools.GenerateCredentialContext(creds)
+}
+
+func (l *Loop) attachCredentialLabels(ctx context.Context, creds []store.SecureCLIBinary) {
+	ls, ok := l.secureCLIStore.(store.SecureCLILabeledCredentialStore)
+	if !ok {
+		return
+	}
+	q := store.SecureCLICredentialLabelQuery{UserID: store.CredentialUserIDFromContext(ctx)}
+	if l.agentUUID != uuid.Nil {
+		agentID := l.agentUUID
+		q.AgentID = &agentID
+	}
+	labels, err := ls.ListCredentialLabels(ctx, q)
+	if err != nil {
+		slog.Warn("secure_cli.labels_list_failed", "agent_id", l.agentUUID, "error", err)
+		return
+	}
+	byBinary := make(map[uuid.UUID][]store.SecureCLICredentialLabel, len(creds))
+	for _, lb := range labels {
+		byBinary[lb.BinaryID] = append(byBinary[lb.BinaryID], lb)
+	}
+	for i := range creds {
+		creds[i].CredentialLabels = byBinary[creds[i].ID]
+	}
 }
 
 // buildMCPToolDescs extracts real descriptions for MCP tools from the registry,

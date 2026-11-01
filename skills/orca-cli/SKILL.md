@@ -46,10 +46,14 @@ agent sandbox, against either the local Orca runtime or a paired remote one.
   `ORCA_PAIRING_CODE` credential. Every call then targets the paired Orca server — worktrees,
   terminals, and launched agents run on **that** machine, not inside your container. Paths
   in results are paths on the Orca machine.
-- In remote mode the paired runtime is fixed by the credential: never pass `--pairing-code`
-  or `--environment`, and put the subcommand first (`orca status --json`, not
-  `orca --json status`). `serve`, `open`, `environment`, `account`, `computer`,
-  `diagnostics`, `skills install|update|share`, and `orchestration reset` are blocked.
+- In remote mode the credential chooses the runtime. If the tools section lists several servers,
+  pick one by its description and pass `--server <label>` as the first argument
+  (`orca --server build-vm status --json`). On "Multiple servers configured" or "Unknown server",
+  re-run with a listed label, or ask the user which machine to use.
+- Never pass `--pairing-code` or `--environment`. Put the subcommand first (`orca status --json`,
+  not `orca --json status`); leading flags other than `--server` are blocked. `serve`, `open`,
+  `environment`, `account` (except `account list`), `computer`, `diagnostics`,
+  `skills install|update|share`, and `orchestration reset` are blocked.
 - If `orca` is missing, or `status` reports a missing credential or an unreachable runtime,
   tell the user what to set up (CLI in the image, `orca` credential, sandbox network access
   to the Orca server) instead of retrying.

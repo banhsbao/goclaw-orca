@@ -7,6 +7,10 @@ import type { CLIAgentCredential, CLIAgentCredentialInput } from "@/types/cli-cr
 
 export type { CLIAgentCredential, CLIAgentCredentialInput };
 
+function labelQuery(label: string) {
+  return label ? `?label=${encodeURIComponent(label)}` : "";
+}
+
 /** Hook for managing agent-scoped credentials on a specific CLI binary. */
 export function useCliAgentCredentials(binaryId: string) {
   const http = useHttp();
@@ -30,16 +34,16 @@ export function useCliAgentCredentials(binaryId: string) {
   );
 
   const getCredential = useCallback(
-    (agentId: string) => http.get<CLIAgentCredential>(
-      `/v1/cli-credentials/${binaryId}/agent-credentials/${agentId}`,
+    (agentId: string, label = "") => http.get<CLIAgentCredential>(
+      `/v1/cli-credentials/${binaryId}/agent-credentials/${agentId}${labelQuery(label)}`,
     ),
     [http, binaryId],
   );
 
   const setCredential = useCallback(
-    async (agentId: string, input: CLIAgentCredentialInput) => {
+    async (agentId: string, input: CLIAgentCredentialInput, label = "") => {
       try {
-        await http.put(`/v1/cli-credentials/${binaryId}/agent-credentials/${agentId}`, input);
+        await http.put(`/v1/cli-credentials/${binaryId}/agent-credentials/${agentId}${labelQuery(label)}`, input);
         await invalidate();
         toast.success(i18n.t("cli-credentials:agentCredentials.saved"));
       } catch (err) {
@@ -54,9 +58,9 @@ export function useCliAgentCredentials(binaryId: string) {
   );
 
   const deleteCredential = useCallback(
-    async (agentId: string) => {
+    async (agentId: string, label = "") => {
       try {
-        await http.delete(`/v1/cli-credentials/${binaryId}/agent-credentials/${agentId}`);
+        await http.delete(`/v1/cli-credentials/${binaryId}/agent-credentials/${agentId}${labelQuery(label)}`);
         await invalidate();
         toast.success(i18n.t("cli-credentials:agentCredentials.deleted"));
       } catch (err) {

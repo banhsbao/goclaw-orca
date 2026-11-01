@@ -184,6 +184,27 @@ func (h *ChannelInstancesHandler) listChannelMCPRows(r *http.Request, inst *stor
 	return rows, nil
 }
 
+func (h *ChannelInstancesHandler) userCredentialBinaries(r *http.Request, userID string) (map[uuidString]bool, bool) {
+	if userID == "" {
+		return nil, false
+	}
+	ls, ok := h.secureCLIStore.(store.SecureCLILabeledCredentialStore)
+	if !ok {
+		return nil, false
+	}
+	labels, err := ls.ListCredentialLabels(r.Context(), store.SecureCLICredentialLabelQuery{UserID: userID})
+	if err != nil {
+		return nil, false
+	}
+	out := make(map[uuidString]bool, len(labels))
+	for _, l := range labels {
+		if l.Source == "user" {
+			out[uuidString(l.BinaryID.String())] = true
+		}
+	}
+	return out, true
+}
+
 func (h *ChannelInstancesHandler) listChannelCLIRows(r *http.Request, inst *store.ChannelInstanceData, scope store.ChannelContextScope, userID string) ([]channelCapabilityDTO, error) {
 	if h.secureCLIStore == nil {
 		return []channelCapabilityDTO{}, nil
@@ -216,6 +237,7 @@ func (h *ChannelInstancesHandler) listChannelCLIRows(r *http.Request, inst *stor
 			}
 		}
 	}
+	userCredBinaries, userCredBatched := h.userCredentialBinaries(r, userID)
 	rows := make([]channelCapabilityDTO, 0, len(binaries))
 	seen := map[uuidString]bool{}
 	for _, b := range binaries {
@@ -240,7 +262,12 @@ func (h *ChannelInstancesHandler) listChannelCLIRows(r *http.Request, inst *stor
 			contextCredential = true
 		}
 		if userID != "" {
-			if creds, err := h.secureCLIStore.GetUserCredentials(r.Context(), b.ID, userID); err == nil && creds != nil && len(creds.EncryptedEnv) > 0 {
+			if userCredBatched {
+				if userCredBinaries[idKey] {
+					credentialSource = "user"
+					hasCredential = true
+				}
+			} else if creds, err := h.secureCLIStore.GetUserCredentials(r.Context(), b.ID, userID); err == nil && creds != nil && len(creds.EncryptedEnv) > 0 {
 				credentialSource = "user"
 				hasCredential = true
 			}

@@ -1875,13 +1875,16 @@ CREATE TABLE IF NOT EXISTS secure_cli_user_credentials (
     tenant_id       TEXT NOT NULL REFERENCES tenants(id),
     credential_type TEXT,
     host_scope      TEXT,
+    label           VARCHAR(32) NOT NULL DEFAULT '',
+    description     TEXT NOT NULL DEFAULT '',
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    UNIQUE(binary_id, user_id, tenant_id)
+    UNIQUE(binary_id, user_id, tenant_id, label)
 );
 
 CREATE INDEX IF NOT EXISTS idx_scuc_tenant ON secure_cli_user_credentials(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_scuc_binary ON secure_cli_user_credentials(binary_id);
+CREATE INDEX IF NOT EXISTS idx_scuc_tenant_user ON secure_cli_user_credentials(tenant_id, user_id);
 
 -- ============================================================
 -- Table: secure_cli_agent_credentials (per-agent encrypted env)
@@ -1902,9 +1905,11 @@ CREATE TABLE IF NOT EXISTS secure_cli_agent_credentials (
     credential_type TEXT,
     host_scope      TEXT,
     created_by      VARCHAR(255) NOT NULL DEFAULT '',
+    label           VARCHAR(32) NOT NULL DEFAULT '',
+    description     TEXT NOT NULL DEFAULT '',
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    UNIQUE(binary_id, agent_id, tenant_id),
+    UNIQUE(binary_id, agent_id, tenant_id, label),
     FOREIGN KEY (binary_id, tenant_id) REFERENCES secure_cli_binaries(id, tenant_id) ON DELETE CASCADE,
     FOREIGN KEY (agent_id, tenant_id) REFERENCES agents(id, tenant_id) ON DELETE CASCADE
 );
