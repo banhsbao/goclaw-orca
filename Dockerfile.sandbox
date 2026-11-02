@@ -1,6 +1,18 @@
 # syntax=docker/dockerfile:1
 
 ARG ENABLE_ORCA_CLI=false
+ARG ENABLE_GOCLAW_CLI=false
+ARG GOCLAW_CLI_IMAGE=ghcr.io/nextlevelbuilder/goclaw:latest
+
+FROM ${GOCLAW_CLI_IMAGE} AS goclaw-cli-src
+
+FROM busybox AS goclaw-cli-true
+COPY --from=goclaw-cli-src /app/goclaw /opt/goclaw-cli/goclaw
+
+FROM busybox AS goclaw-cli-false
+RUN mkdir -p /opt/goclaw-cli
+
+FROM goclaw-cli-${ENABLE_GOCLAW_CLI} AS goclaw-cli
 
 FROM node:24-bookworm-slim AS orca-cli-true
 ARG ORCA_CLI_VERSION=1.4.243
@@ -45,6 +57,9 @@ RUN apt-get update \
 
 COPY --from=orca-cli /opt/orca-cli /opt/orca-cli
 RUN if [ -x /opt/orca-cli/bin/orca ]; then ln -s /opt/orca-cli/bin/orca /usr/local/bin/orca; fi
+
+COPY --from=goclaw-cli /opt/goclaw-cli /opt/goclaw-cli
+RUN if [ -x /opt/goclaw-cli/goclaw ]; then mkdir -p /app && ln -s /opt/goclaw-cli/goclaw /app/goclaw; fi
 
 RUN useradd --create-home --shell /bin/bash sandbox
 USER sandbox
