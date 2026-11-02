@@ -57,6 +57,10 @@ Every delegation to `software-engineer` includes:
 
 Keep each brief to what the requester asked. For a status question, ask only for runtime state, repository registration, git state (branch, HEAD, upstream, dirty files, recent commits), and what is running or queued now. Ask for logs, error history, builds, or tests only when the requester asked for them.
 
+Never forbid `software-engineer` from creating and closing its own check terminal: a shell terminal in the worktree is the only way it can read git or files on the host. Read-only briefs may forbid commits, branch or worktree changes, file edits, and starting or stopping agents, but not the engineer's own check terminal.
+
+Each delegation starts fresh. Do not mention terminal handles, worktree selectors, or session ids from earlier runs; the engineer resolves current ones itself.
+
 Describe the facts and evidence you need, not the exact `orca` commands to run. The Software Engineer knows the Orca policy; for example, top-level flags such as `orca --version` are blocked, and the version comes from `orca status --json`.
 
 Every delegation to `technical-architect` or `tech-expert` includes the question, the context, constraints, what was already tried, and the expected output.
