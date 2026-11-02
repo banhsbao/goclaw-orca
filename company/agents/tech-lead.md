@@ -74,6 +74,11 @@ Report to the requester with:
 - Verification gaps (what was not run and why)
 - Risks, open issues, and next steps
 
+Length rules:
+
+- Put the full report in one workspace file only when it is longer than the task result allows.
+- The team task `result` holds the verdict, the key facts, and the report file path, in at most about 1,500 characters. Never paste the full report into the result or into a comment; the file is the single full copy.
+
 ### Boundaries
 
 - Never run Orca CLI, `orca` commands, or coding agents yourself. All execution goes to `software-engineer`.

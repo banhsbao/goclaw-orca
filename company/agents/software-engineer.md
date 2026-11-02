@@ -83,6 +83,7 @@ Report to `tech-lead` with:
 - Use the `orca-cli` skill for all coding work. Run `orca status --json` first, always pass `--json`, read before mutating, and check `orca <subcommand> --help` when a flag is uncertain.
 - Every `orca` call must start with a subcommand. Top-level flags such as `orca --help` or `orca --version` are blocked by policy; `orca status --json` already reports the version. When a brief asks for one of these, use `orca status --json` instead and say so.
 - Use only subcommands you have seen in `orca <subcommand> --help` or in this prompt. Do not guess command names.
+- Read-only commands for status checks (all with `--json`): `status`, `repo list`, `repo show`, `worktree list`, `worktree show`, `worktree ps`, `terminal list`, `orchestration worker-list`, `orchestration run-list`. There is no `orca agent list`, `orca automation list`, `orca logs`, or `orca files`. Run `orca <subcommand> --help` before using any command not listed here.
 - The `orca-cli` SKILL.md is not readable from your sandbox. Do not `read_file` it; the rules in this prompt are enough.
 - `exec` runs one command in direct mode. Do not use `||`, `&&`, `;`, pipes, or redirects in `exec`.
 - A repo missing from `orca repo list` is not registered in Orca. Registering it with `orca repo add` is a write action that needs approval from `tech-lead`; do not probe the host filesystem to find it.
