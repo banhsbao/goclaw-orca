@@ -125,6 +125,10 @@ func (t *TeamTasksTool) executeCreate(ctx context.Context, args map[string]any) 
 		return ErrorResult("team lead cannot assign tasks to itself — delegate to a team member instead. You are the team lead; handle this work directly or assign to one of your members.")
 	}
 
+	if strings.TrimSpace(description) == "" {
+		return ErrorResult("description is required for create action — put the full brief (objective, context, constraints, expected output) in `description`. `text` and `type` are comment fields and are ignored by create.")
+	}
+
 	requireApproval, _ := args["require_approval"].(bool)
 	status := store.TeamTaskStatusPending
 	if requireApproval {

@@ -250,6 +250,12 @@ Guards that previously prevented delegate agents from directly completing, cance
 
 When creating a task via `team_tasks(action="create")`, the `assignee` field is **required**. This specifies which team member should handle the task. If omitted, error: `"assignee is required — specify which team member should handle this task"`
 
+### Description is Mandatory
+
+`create` also requires a non-empty `description` holding the full brief. A task without one is rejected before it is stored, so the board never holds an empty task that the lead then tries to patch. The error names `description` and notes that `text` and `type` are comment fields that `create` ignores.
+
+`update` accepts only `description`, `subject`, and `blocked_by`. When none of them is set, the error lists any other fields that were passed (for example `type`, `task_type`, `text`) and points to `description`.
+
 ### Concurrent Creation Guard
 
 Agents must check existing tasks before creating new ones. This prevents duplicate task creation in concurrent sessions. The preferred method is `team_tasks(action="search", query="<keywords>")` which uses semantic + keyword matching and saves tokens vs listing all. Alternatively `action="list"` shows the full board. When an agent calls `create` without first checking:

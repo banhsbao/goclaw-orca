@@ -299,7 +299,7 @@ func (t *TeamTasksTool) executeUpdate(ctx context.Context, args map[string]any) 
 		updates["blocked_by"] = blockedBy
 	}
 	if len(updates) == 0 {
-		return ErrorResult("no updates provided (set description, subject, or blocked_by)")
+		return ErrorResult("no updates provided (set description, subject, or blocked_by)" + ignoredUpdateFieldsHint(args))
 	}
 
 	if err := t.manager.Store().UpdateTask(ctx, taskID, updates); err != nil {

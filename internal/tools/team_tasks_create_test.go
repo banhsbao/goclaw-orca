@@ -100,10 +100,11 @@ func TestCreate(t *testing.T) {
 		_ = result
 
 		result = tool.Execute(memberCtx, map[string]any{
-			"action":    "create",
-			"subject":   "Need help with this",
-			"task_type": "request",
-			"assignee":  "member2-agent",
+			"action":      "create",
+			"subject":     "Need help with this",
+			"description": "Review the failing import and suggest a fix",
+			"task_type":   "request",
+			"assignee":    "member2-agent",
 		})
 		if result.IsError {
 			t.Fatalf("unexpected error: %s", result.ForLLM)
@@ -318,6 +319,7 @@ func TestCreate(t *testing.T) {
 		result := tool.Execute(ctx, map[string]any{
 			"action":           "create",
 			"subject":          "Approval task",
+			"description":      "Draft the release notes",
 			"assignee":         "member-agent",
 			"require_approval": true,
 		})
@@ -352,10 +354,11 @@ func TestCreate(t *testing.T) {
 		mb.taskStore.mu.Unlock()
 
 		result := tool.Execute(ctx, map[string]any{
-			"action":     "create",
-			"subject":    "Blocked task",
-			"assignee":   "member-agent",
-			"blocked_by": []any{blockerID.String()},
+			"action":      "create",
+			"subject":     "Blocked task",
+			"description": "Run after the blocker finishes",
+			"assignee":    "member-agent",
+			"blocked_by":  []any{blockerID.String()},
 		})
 		if result.IsError {
 			t.Fatalf("unexpected error: %s", result.ForLLM)
@@ -383,9 +386,10 @@ func TestCreate(t *testing.T) {
 		ctx = WithPendingTeamDispatch(ctx, ptd)
 
 		result := tool.Execute(ctx, map[string]any{
-			"action":   "create",
-			"subject":  "Tracked task",
-			"assignee": "member-agent",
+			"action":      "create",
+			"subject":     "Tracked task",
+			"description": "Track dispatch for this task",
+			"assignee":    "member-agent",
 		})
 		if result.IsError {
 			t.Fatalf("unexpected error: %s", result.ForLLM)
@@ -413,15 +417,41 @@ func TestCreate(t *testing.T) {
 		ctx = WithPendingTeamDispatch(ctx, ptd)
 
 		result := tool.Execute(ctx, map[string]any{
-			"action":   "create",
-			"subject":  "Implement and design the new feature",
-			"assignee": "member-agent",
+			"action":      "create",
+			"subject":     "Implement and design the new feature",
+			"description": "Build the feature end to end",
+			"assignee":    "member-agent",
 		})
 		if result.IsError {
 			t.Fatalf("unexpected error: %s", result.ForLLM)
 		}
 		if !strings.Contains(result.ForLLM, "Warning") {
 			t.Errorf("expected Warning in response for compound subject, got: %s", result.ForLLM)
+		}
+	})
+
+	t.Run("RequiresDescription", func(t *testing.T) {
+		mb, tool, _, _, ctx := newTestTeamSetup()
+		ptd := NewPendingTeamDispatch()
+		ptd.MarkListed()
+		ctx = WithPendingTeamDispatch(ctx, ptd)
+
+		result := tool.Execute(ctx, map[string]any{
+			"action":    "create",
+			"subject":   "Fresh live status check",
+			"assignee":  "member-agent",
+			"task_type": "general",
+			"text":      "placeholder",
+			"type":      "note",
+		})
+		if !result.IsError || !strings.Contains(result.ForLLM, "description is required") {
+			t.Fatalf("expected description-required error, got: %s", result.ForLLM)
+		}
+		mb.taskStore.mu.Lock()
+		created := len(mb.taskStore.tasks)
+		mb.taskStore.mu.Unlock()
+		if created != 0 {
+			t.Errorf("expected no task to be created, got %d", created)
 		}
 	})
 }

@@ -324,6 +324,28 @@ func TestUpdate(t *testing.T) {
 			t.Errorf("expected no-updates error, got: %s", result.ForLLM)
 		}
 	})
+
+	t.Run("NoUpdatesNamesIgnoredFields", func(t *testing.T) {
+		mb, tool, leadID, memberID, ctx := newTestTeamSetup()
+		taskID := makeTask(mb, testTeamID, memberID, store.TeamTaskStatusPending)
+
+		leadCtx := store.WithAgentID(ctx, leadID)
+		leadCtx = WithTaskActionFlags(leadCtx, &TaskActionFlags{})
+
+		result := tool.Execute(leadCtx, map[string]any{
+			"action":    "update",
+			"task_id":   taskID.String(),
+			"type":      "note",
+			"task_type": "general",
+		})
+
+		if !result.IsError {
+			t.Fatalf("expected error, got: %s", result.ForLLM)
+		}
+		if !strings.Contains(result.ForLLM, "update ignores task_type, type") || !strings.Contains(result.ForLLM, "description=") {
+			t.Errorf("expected hint naming ignored fields and description, got: %s", result.ForLLM)
+		}
+	})
 }
 
 func TestAttach(t *testing.T) {
