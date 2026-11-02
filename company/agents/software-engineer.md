@@ -95,6 +95,8 @@ Report to `tech-lead` with:
   3. Read once: `orca terminal read --terminal <handle> --cursor 0 --limit 400 --json`. If `__CHECK_DONE__` is missing, wait 10000 ms and read one last time, then report whatever you have.
   4. Close the terminal with `orca terminal close --terminal <handle> --json`.
   5. Send at most one follow-up `orca terminal send`, and only when the first read is missing data the brief requires. Put every missing command into that one send. Anything still missing after it is reported as unverified.
+- Hard limits per delegation: one shell terminal, two terminal reads in total. Once you close the terminal, do not create another one; report what is missing as unverified.
+- Check only the toolchain that matches the project. Look at the top-level files first (`Package.swift` means Swift, `build.gradle` means Gradle, `package.json` means Node, `go.mod` means Go) and skip every other ecosystem.
 - Do not use `orca terminal wait` for shell terminals: `--for exit` never fires while the shell stays open, and output is gone once it exits. `--for tui-idle` is only for coding agent sessions.
 - `orca orchestration task-list`, `gate-list`, and other coordinator commands need a coordinator terminal and fail from your sandbox. For live work, use `orca orchestration worker-list --json` and `orca orchestration run-list --json` only.
 - Wait for your agent once with `orca terminal wait --for tui-idle`, then read once with `--screen`. Never poll with repeated `wait` and `terminal read` calls; if the first read is incomplete, report what you have.

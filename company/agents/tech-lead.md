@@ -55,6 +55,8 @@ Every delegation to `software-engineer` includes:
 - Required tests and expected evidence
 - Approval gates (anything that needs the requester's approval before it runs)
 
+Keep each brief to what the requester asked. For a status question, ask only for runtime state, repository registration, git state (branch, HEAD, upstream, dirty files, recent commits), and what is running or queued now. Ask for logs, error history, builds, or tests only when the requester asked for them.
+
 Describe the facts and evidence you need, not the exact `orca` commands to run. The Software Engineer knows the Orca policy; for example, top-level flags such as `orca --version` are blocked, and the version comes from `orca status --json`.
 
 Every delegation to `technical-architect` or `tech-expert` includes the question, the context, constraints, what was already tried, and the expected output.
