@@ -232,7 +232,75 @@ goclaw traces get <trace-id> -o json
 goclaw traces export <trace-id> --file trace.json.gz
 goclaw traces follow --session <session-key> --since 2026-06-12T01:00:00Z
 goclaw traces timeline <trace-id>
+goclaw traces digest --since 24h --exclude-agent ops-retro -o json
+goclaw traces brief <trace-id> --errors-only
 ```
+
+`traces brief` prints one line per LLM span (prompt/output tokens, finish
+reason) and tool span (tool, input preview, error), capped by `--width`
+(default 160). It is meant for agents and humans reading a trace in a few
+kilobytes instead of the full span JSON.
+
+`traces digest` loads every trace in a window (`--since`/`--until`, duration or
+RFC3339; `--max-traces`, default 500), groups delegation trees into runs via
+`parent_trace_id`, and reports per-run and per-agent tokens, cost, LLM rounds,
+tool calls and tool errors. Totals cover every run; the `runs` list keeps the
+`--max-runs` most expensive (default 12) and `findings` are capped by
+`--max-findings` (default 25). JSON output is compact and puts findings before
+runs so it fits one agent tool result. It also emits findings with a severity and a
+`fix_hint` (`prompt`, `config`, `env`, `review`):
+
+| Kind | Trigger |
+|------|---------|
+| `tool_error` | Failed tool span, grouped by agent, tool, class and normalized message. Classes: `policy_blocked`, `sandbox_conflict`, `unknown_command`, `scope_denied`, `tool_validation`, `sandbox_fs`, `timeout`, `other` |
+| `repeated_call` | Same tool with identical input `--repeat-min` times in one trace (default 3) |
+| `truncated_output` | LLM span with `finish_reason=length` |
+| `large_prompt` | LLM call prompt ≥ `--large-prompt` tokens (default 40000) |
+| `many_rounds` | Trace with ≥ `--many-rounds` LLM calls (default 12) |
+| `redelegation` | Same source agent delegated to the same target more than once in a run |
+| `trace_error` | Trace ended with status `error` |
+
+Runs that include any `--exclude-agent` key are skipped entirely, so a retro
+agent does not measure its own runs. The digest makes no LLM calls; the code
+lives in `internal/tracing/digest`.
+
+Non-admin callers only see their own traces (`internal/http/traces.go`), so a
+digest over every agent needs an admin-role token.
+
+### Agent prompt patches
+
+`goclaw agent-files get --agent <key> --file <name>` prints a live prompt file.
+`goclaw agent-files patch --agent <key> --file AGENTS.md --old '<text>' --new '<text>' [--dry-run]`
+replaces exactly one occurrence and prints a JSON result. Guards enforced by the
+command:
+
+- Only `AGENTS.md` and `CAPABILITIES.md` can be patched; `--old` and `--new` are capped at 1500 characters each.
+- `--old` must occur exactly once; zero or multiple matches are rejected.
+- Agents listed in `GOCLAW_AGENT_FILES_PROTECTED_AGENTS` (comma-separated) are rejected.
+- When `GOCLAW_AGENT_FILES_BACKUP_DIR` is set, the previous content is written there before the update.
+- The file is read back after `agents.files.set`; `verified` is true only when it matches.
+- Every result carries `proposal_hash`, a hash of agent, file, old and new text.
+- When `GOCLAW_AGENT_FILES_APPROVAL_SECRET` is set, a real (non `--dry-run`) patch needs `--approval <code>`. `goclaw agent-files approve --hash <proposal_hash>` issues the code as an HMAC of the hash with that secret, so a code only unlocks the exact patch it was issued for. Give the proposing agent a grant that denies `^agent-files\s+approve\b`, and the approving agent a grant that denies `^traces\b` and `^agent-files\s+(?:get|patch)\b`, so neither can change a prompt alone.
+
+### Running from a sandboxed agent
+
+Credentialed exec runs the binary inside the agent's sandbox at the same path
+as on the gateway. Build the sandbox image with the gateway binary at
+`/app/goclaw`:
+
+```bash
+docker build --build-arg ENABLE_GOCLAW_CLI=true \
+  --build-arg GOCLAW_CLI_IMAGE=<local gateway image> \
+  -t goclaw-sandbox:bookworm-slim -f Dockerfile.sandbox .
+```
+
+Register a Secure CLI credential for `goclaw` with `binary_path=/app/goclaw`,
+`GOCLAW_SERVER` pointing at an address the sandbox can reach (for example the
+Docker host bridge IP), and `GOCLAW_GATEWAY_TOKEN`. Restrict subcommands with
+`deny_args`, for example `^-`, `^(?:[^ta]|t[^r]|a[^g])`, `^agent(?:\s|$)`,
+`^traces\s+(?:export|follow)\b`, `^(?:traces|agent-files)\S`,
+`(^|\s)--?(server|token|config)\b`, so only `traces` reads and `agent-files`
+are reachable.
 
 By default, commands use the same local gateway config and
 `GOCLAW_GATEWAY_TOKEN` behavior as existing admin commands. For remote

@@ -64,6 +64,7 @@ func init() {
 	rootCmd.AddCommand(skillsCmd())
 	rootCmd.AddCommand(sessionsCmd())
 	rootCmd.AddCommand(tracesCmd())
+	rootCmd.AddCommand(agentFilesCmd())
 	rootCmd.AddCommand(migrateCmd())
 	rootCmd.AddCommand(upgradeCmd())
 	rootCmd.AddCommand(backupCmd())
