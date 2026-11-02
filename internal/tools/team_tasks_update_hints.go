@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+const minTextAsDescriptionLen = 40
+
 var nonUpdateTaskFields = []string{"text", "type", "task_type", "result", "status", "priority", "assignee"}
 
 func ignoredUpdateFieldsHint(args map[string]any) string {

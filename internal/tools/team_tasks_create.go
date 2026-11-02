@@ -57,6 +57,12 @@ func (t *TeamTasksTool) executeCreate(ctx context.Context, args map[string]any) 
 	}
 
 	description, _ := args["description"].(string)
+	if strings.TrimSpace(description) == "" {
+		if text, _ := args["text"].(string); len(strings.TrimSpace(text)) >= minTextAsDescriptionLen {
+			slog.Warn("team_tasks.create: description empty, using text as description", "subject", subject, "text_len", len(text))
+			description = text
+		}
+	}
 	priority := 0
 	if p, ok := args["priority"].(float64); ok {
 		priority = int(p)

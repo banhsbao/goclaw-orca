@@ -252,7 +252,7 @@ When creating a task via `team_tasks(action="create")`, the `assignee` field is 
 
 ### Description is Mandatory
 
-`create` also requires a non-empty `description` holding the full brief. A task without one is rejected before it is stored, so the board never holds an empty task that the lead then tries to patch. The error names `description` and notes that `text` and `type` are comment fields that `create` ignores.
+`create` also requires a non-empty `description` holding the full brief. When `description` is empty but `text` holds at least 40 characters, `create` treats `text` as the brief and logs a warning, because some models put the brief in the comment field. Otherwise a task without a description is rejected before it is stored, so the board never holds an empty task that the lead then tries to patch. The error names `description` and notes that `text` and `type` are comment fields that `create` ignores.
 
 `update` accepts only `description`, `subject`, and `blocked_by`. When none of them is set, the error lists any other fields that were passed (for example `type`, `task_type`, `text`) and points to `description`.
 

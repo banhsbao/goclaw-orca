@@ -454,4 +454,33 @@ func TestCreate(t *testing.T) {
 			t.Errorf("expected no task to be created, got %d", created)
 		}
 	})
+
+	t.Run("UsesTextAsDescriptionWhenBriefIsMisplaced", func(t *testing.T) {
+		mb, tool, _, _, ctx := newTestTeamSetup()
+		ptd := NewPendingTeamDispatch()
+		ptd.MarkListed()
+		ctx = WithPendingTeamDispatch(ctx, ptd)
+
+		brief := "Objective: report the current live status of Prism with git and runtime evidence."
+		result := tool.Execute(ctx, map[string]any{
+			"action":    "create",
+			"subject":   "Fresh live status check",
+			"assignee":  "member-agent",
+			"task_type": "general",
+			"text":      brief,
+		})
+		if result.IsError {
+			t.Fatalf("unexpected error: %s", result.ForLLM)
+		}
+		mb.taskStore.mu.Lock()
+		defer mb.taskStore.mu.Unlock()
+		if len(mb.taskStore.tasks) != 1 {
+			t.Fatalf("expected 1 task, got %d", len(mb.taskStore.tasks))
+		}
+		for _, task := range mb.taskStore.tasks {
+			if task.Description != brief {
+				t.Errorf("expected description to be the text brief, got %q", task.Description)
+			}
+		}
+	})
 }
