@@ -34,7 +34,7 @@ func (t *TeamTasksTool) executeComment(ctx context.Context, args map[string]any)
 
 	text, _ := args["text"].(string)
 	if text == "" {
-		return ErrorResult("text is required for comment action")
+		return ErrorResult(`text is required for comment action. Retry with the comment body in text, e.g. team_tasks(action="comment", task_id="<id>", type="blocker", text="<what blocks the task and what you already tried>")`)
 	}
 	if len(text) > 10000 {
 		return ErrorResult("comment text too long (max 10000 chars)")
