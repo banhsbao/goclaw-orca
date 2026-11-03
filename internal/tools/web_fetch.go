@@ -323,14 +323,32 @@ func (t *WebFetchTool) fetchRawContent(ctx context.Context, rawURL, extractMode 
 	}
 	defer resp.Body.Close()
 
+	contentType := resp.Header.Get("Content-Type")
+	finalURL := resp.Request.URL.String()
+
+	if isBinaryContentType(contentType) {
+		return fetchRawResult{
+			content:    binaryContentNotice(contentType, resp.ContentLength),
+			extractor:  "binary",
+			finalURL:   finalURL,
+			statusCode: resp.StatusCode,
+		}, nil
+	}
+
 	readLimit := int64(max(maxChars*10, 512*1024))
 	body, err := io.ReadAll(io.LimitReader(resp.Body, readLimit))
 	if err != nil {
 		return fetchRawResult{}, fmt.Errorf("read body: %w", err)
 	}
 
-	contentType := resp.Header.Get("Content-Type")
-	finalURL := resp.Request.URL.String()
+	if looksBinary(body) {
+		return fetchRawResult{
+			content:    binaryContentNotice(contentType, int64(len(body))),
+			extractor:  "binary",
+			finalURL:   finalURL,
+			statusCode: resp.StatusCode,
+		}, nil
+	}
 
 	var text string
 	var extractor string
@@ -366,7 +384,7 @@ func (t *WebFetchTool) fetchRawContent(ctx context.Context, rawURL, extractMode 
 	}
 
 	return fetchRawResult{
-		content:    text,
+		content:    strings.ReplaceAll(text, "\x00", ""),
 		extractor:  extractor,
 		finalURL:   finalURL,
 		statusCode: resp.StatusCode,
