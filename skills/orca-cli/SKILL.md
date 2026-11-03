@@ -4,7 +4,7 @@ description: Use this skill when operating the Orca desktop app/runtime through 
 license: Proprietary. Part of GoClaw bundled skills.
 metadata:
   author: GoClaw
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # Orca CLI
@@ -59,6 +59,39 @@ agent sandbox, against either the local Orca runtime or a paired remote one.
   to the Orca server) instead of retrying.
 - `orca` is not on the exec safe-bin list, so exec approval (`on-miss`) may ask the user
   to approve the first call.
+- If exec answers `Binary "orca" requires a secure CLI grant`, this agent is not allowed to run
+  Orca. Report it as a blocker and stop; retrying or rewording the command cannot fix it.
+
+### How exec runs `orca`
+
+`orca` runs in Direct Exec Mode: exec passes your arguments straight to the binary, with no
+shell in between. Commands that ignore this fail before Orca sees them, so:
+
+- **One `orca` command per exec call.** No `|`, `;`, `&&`, `>`, `2>&1`, `$()` or backticks.
+  Trim output with `--limit`, page with `--cursor`, and save results with `write_file`
+  instead of `head` or `>`.
+- **Subcommand first.** `orca --help` and `orca --version` are blocked. The version is in
+  `orca status --json`; the full command list is in `orca agent-context`.
+- **Ask `--help` only for commands listed in this skill.** An unknown command such as
+  `orca files --help` prints the generic top-level help instead of an error, so probing for
+  command names wastes calls and tells you nothing.
+- **Stay on one server.** With several paired servers, pass the same `--server <label>` on
+  every call. A call without it can reach a different runtime, and its repos, worktrees and
+  handles will not match.
+- **Paths belong to the Orca machine.** Worktree, repo and destination paths are paths on
+  the server Orca runs on (for example `/Users/...` on a Mac), never the gateway's
+  `/workspace` or `/home/...`.
+
+Names agents commonly get wrong:
+
+| Wrong | Right |
+|-------|-------|
+| `orca simulator ...` | `orca emulator ...` |
+| `orca automation list` | `orca automations list` |
+| `orca agent list` | `orca worktree ps --json` or `orca terminal list --json` |
+| `terminal wait --timeout 60` | `terminal wait --timeout-ms 60000` |
+| `terminal send --command "..."` | `terminal send --text "..." --enter` |
+| `terminal read --session 3` | `terminal read --terminal <handle>` |
 
 ## Selectors
 
@@ -70,6 +103,15 @@ agent sandbox, against either the local Orca runtime or a paired remote one.
 
 `active`/`current` resolve from the exec working directory. When the GoClaw workspace is
 not inside an Orca worktree, use an explicit `id:` selector.
+
+- `path:` must be the path of an existing worktree from `worktree list`. An arbitrary folder
+  such as `/tmp` or a home directory is rejected.
+- On a remote server, `terminal create` always needs `--worktree`.
+- Copy ids and terminal handles in full from the JSON you received. Never shorten, retype or
+  reconstruct one: a handle that does not exist comes back as `terminal_handle_stale`.
+- `orca orchestration task-list`, `gate-list` and the other coordinator commands act on the
+  mailbox of the terminal that runs them, so they fail from exec. From exec, use only
+  `orchestration worker-list --json` and `orchestration run-list --json`.
 
 ## Inspect
 
@@ -99,6 +141,24 @@ orca worktree rm --worktree id:<repoId>::<path> --force --json  # confirm first
 - Use `--no-parent` and omit `--base-branch` for independent work, so Orca uses the repo's
   default base. Branch from the current branch only when the user asks for stacked work.
 - `--setup run|skip|inherit` controls repo setup hooks (default `inherit`).
+
+### Getting a repo into Orca
+
+Check `orca repo list --json` first; the repo may already be there. Cloning and adding are
+write actions: get whatever approval your role requires before running them.
+
+```bash
+orca project setup-clone --project github:<owner>/<repo> --host local --url https://github.com/<owner>/<repo>.git --destination <absolute parent dir on the Orca machine> --json
+orca repo add --path <absolute path of an existing checkout on the Orca machine> --json
+```
+
+- Write the project id in lowercase (`github:luminoid/prism`). Orca normalizes it, and a
+  mixed-case id is rejected as a mismatch.
+- `--destination` is the parent folder; Orca creates the repo folder inside it. If that
+  folder already exists, use `repo add` on it instead of cloning again.
+- `unable to get password from user` or `Could not read from remote repository` means the
+  repo is private and the Orca machine has no credentials for it. Stop and report that.
+  Switching between HTTPS and SSH URLs does not help.
 
 ### Status comments
 
@@ -211,6 +271,8 @@ orca terminal close --terminal <handle> --json
 - `accepted: true` on a send means input was accepted, not that the agent started a turn.
   Pass `--wait-submit <seconds>` when you need proof. Never resend just because output is quiet.
 - Always pass `--timeout-ms` to `wait`. Use `tui-idle` for agent CLIs and `exit` for commands.
+- A `wait` that returns `timeout` means the work is still running, not that it failed. Do
+  not wait again in a loop. Read the screen once, then report progress or schedule a check.
 - For long output, page with `--cursor <nextCursor> --limit 1000` while `limited` is true.
 - If a send is refused with `agent_prompt_blocked`, the agent is showing a permission menu:
   report it to the user rather than answering the menu yourself.
@@ -227,13 +289,46 @@ read) and keeps the whole job outside any coding agent's review.
 - Multi-step work goes to a coding agent through `worktree create --agent` or
   `agent launch`: editing files, building, deploying, calling external APIs, and anything
   that touches credentials. You verify the result afterwards.
-- For a single command, run it as its own terminal and collect the result in one `exec`:
+- For quick checks, put every command you need into one terminal and read it once:
 
 ```bash
-orca terminal create --worktree <selector> --title check --command "<cmd>" --json
-orca terminal wait --terminal <handle> --for exit --timeout-ms 60000 --json
-orca terminal read --terminal <handle> --json
+orca terminal create --worktree <selector> --title check --command "<cmd1>; echo ===; <cmd2>; echo __CHECK_DONE__" --json
+orca terminal read --terminal <handle> --cursor 0 --limit 400 --json    # after waiting ~15 s with the wait tool
+orca terminal close --terminal <handle> --json
 ```
+
+- The host shell takes 10 to 15 seconds to start, so wait with the `wait` tool before the
+  first read. If `__CHECK_DONE__` is missing, wait once more and read one last time.
+- Do not use `terminal wait` on a shell terminal. `--for exit` never fires while the shell
+  stays open, and the output is gone once it exits. `--for tui-idle` is for coding agents.
+- The `--command` text is typed into a real shell on the Orca machine, so pipes, `;` and
+  redirects work inside it. That is the place for `ls ... | head` or `adb devices`, not the
+  exec call itself.
+
+## Mobile Emulators
+
+Orca drives iOS simulators and Android emulators for a worktree.
+
+```bash
+orca emulator devices --json                                   # every iOS/Android device known
+orca emulator list --worktree <selector> --json                # running emulators
+orca emulator attach <device> --worktree <selector> --json     # make one active for the worktree
+orca emulator ax --worktree <selector> --json                  # accessibility tree: what is on screen
+orca emulator tap <x> <y> --worktree <selector> --json         # normalized 0..1 coordinates
+orca emulator install|launch ...                               # Android: install APK, launch by package
+```
+
+- Run `attach` first. Every other emulator command acts on the worktree's active emulator and
+  fails with `emulator_no_active` until one is attached.
+- Pass the device as the positional argument of `attach`, using the id from `devices`.
+- Use `ax` to check what the app shows.
+- `orca screenshot` captures a browser tab, so take a device screenshot through the
+  emulator stream: `attach` returns a `streamUrl`; open it with
+  `orca tab create --url <streamUrl> --json` to get a `browserPageId`, wait about 5 seconds,
+  then run `orca screenshot --format jpeg --page <browserPageId> --json`.
+- Avoid `emulator exec`. It passes raw text to the device helper and rejects most
+  commands; use the dedicated subcommands above.
+- Building and running an app (Xcode, Gradle) is multi-step work: hand it to a coding agent.
 
 ## References, Search, Automations
 
@@ -269,6 +364,12 @@ type credentials the user did not give you.
 | Symptom | Action |
 |---------|--------|
 | `orca: command not found` | CLI not installed/registered on the gateway host; report and stop |
+| `requires a secure CLI grant` | This agent may not run Orca; report it as a blocker and stop |
+| `Direct Exec Mode` / `shell operators` | Remove pipes and redirects; one `orca` command per exec |
+| `Matched deny pattern: ^-` | A flag came before the subcommand; put the subcommand first |
+| `terminal_handle_stale` | Re-list terminals and use a handle copied from that result |
+| `emulator_no_active` | Run `orca emulator attach <device> --worktree <selector>` first |
+| `repo_not_found` with a `path:` selector | The path is not an Orca repo on that server; check `repo list` |
 | `status` shows runtime unreachable | Orca app is not running; ask the user, or `orca open` if they agree |
 | Unknown flag / command | Check `orca <command> --help` and `orca skills get orca-cli` for this build |
 | `active` selector fails | exec cwd is not inside an Orca worktree; use `id:<repoId>::<path>` |
