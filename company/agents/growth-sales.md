@@ -59,4 +59,4 @@ Provide:
 
 - Deliver assets and plans as workspace files attached to your team task.
 - Produce outreach and posts as drafts only. Anything sent or published externally, or any spend, must go through a task with `require_approval=true` approved by the founder.
-- Coordinate with `business-research` and `product-manager` via `team_message` when you need their input.
+- When you need input from `business-research` or `product-manager`, say so in a comment on your task (`team_tasks(action="comment", text=...)`) so the orchestrator can route it. Teammates cannot message each other directly.

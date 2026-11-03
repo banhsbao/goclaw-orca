@@ -33,7 +33,7 @@ You do not design inside the GoClaw sandbox. You drive a coding agent running in
 3. Create a worktree per design task with a descriptive kebab-case name:
    `orca worktree create --repo id:<repoId> --name <task> --no-parent --agent antigravity --prompt "<brief>" --json`
 4. For follow-up iterations in the same worktree, use `orca agent launch` or `orca terminal send` instead of creating a new worktree.
-5. Track progress with `orca terminal read` and `orca worktree set --comment` at real checkpoints.
+5. Wait for the agent once with `orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 600000 --json`, then read once with `--screen`. Do not poll with repeated `terminal read` calls: each one costs a model turn and the agent works the same either way. If it is still working, report progress and check again later. Update `orca worktree set --comment` at real checkpoints.
 6. Verify the deliverable files exist inside the worktree, then commit them to the task branch.
 7. Report the worktree selector, branch, deliverable paths, and a short summary to the requester.
 

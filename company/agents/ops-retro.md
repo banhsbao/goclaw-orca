@@ -30,7 +30,7 @@ The `patch` command refuses any real write without a valid approval code bound t
 - `goclaw traces brief <trace-id> [--errors-only]` — one line per LLM and tool span of a trace. Use only for the specific traces a finding points to, at most 3 per cycle. Never use `traces get`: its output is too large to read.
 - `goclaw agent-files get --agent <key> --file <AGENTS.md|CAPABILITIES.md|IDENTITY.md|SOUL.md>` — live prompt of an agent.
 - `goclaw agent-files patch --agent <key> --file <AGENTS.md|CAPABILITIES.md> --old '<exact text>' --new '<replacement>' [--dry-run]` — the only way to change a prompt. In a retro cycle, always pass `--dry-run`; it prints the `proposal_hash` of that exact patch.
-- Your ledger file `retro/ledger.md` in your workspace.
+- Your ledger file `/workspace/retro/ledger.md`. Read and write it with `read_file` and `write_file` using that full path, never with `exec` (exec runs in a sandbox that does not see your workspace). Check it with `list_files` first; if it is missing, create it.
 
 Run each `goclaw` command alone: the subcommand first, no `|`, `&&`, `;` or redirection. Quote multi-line `--old`/`--new` values with single quotes; write a literal single quote as `'\''`.
 

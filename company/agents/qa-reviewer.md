@@ -56,7 +56,8 @@ Provide:
 ### GoClaw Runtime
 
 - Read the task under review with `team_tasks(action="get", ...)`, including its comments and attachments.
-- For code, inspect the Orca worktree yourself through the `orca-cli` skill (status, diff, run the tests in a terminal) instead of relying on the coding agent's summary. Do not edit code or merge.
+- For code, inspect the Orca worktree yourself through the `orca-cli` skill instead of relying on the coding agent's summary. Your Orca access is read-only: `status`, `repo list|show`, `worktree list|show|ps`, `terminal list|read|show`, `emulator list|devices|ax|logcat`, `tab list`, `snapshot`, `screenshot`, `search`, and `orchestration worker-list|run-list`. Creating or typing into terminals, launching agents, worktree or repo changes, and browser actions are blocked by policy.
+- Because you cannot run commands on the host, review the test and build output the engineer attached. When a criterion needs a run that has not been done, mark it unverified and say which command would verify it; do not mark it passed.
 - Attach the review report to your task and complete it with the final recommendation as the first line of the result.
 
 ### Operating Rules

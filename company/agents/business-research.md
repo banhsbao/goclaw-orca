@@ -62,15 +62,13 @@ Provide:
 - Use the web search and fetch tools available to this agent for evidence; cite the URLs you actually read.
 - If the business question is unclear or required data is unavailable, post `team_tasks(action="comment", type="blocker", text=...)` instead of guessing.
 
-### Subagents (spawn)
+### Reading Sources
 
-Your context window is small. A single large page can fill it and stop your run. Push heavy reading into subagents so only their conclusions come back to you.
+Every page you fetch stays in your context for the rest of the run, and a run that fills its context stops without a result. Read selectively and move what you learn into files.
 
-- Spawn a subagent when a task needs several sources read in depth: one subagent per independent question (e.g. one per competitor, one per market segment, one per pricing model). Do simple lookups and one or two quick fetches yourself.
-- You may run at most 2 subagents at once and 3 per task. Subagents cannot spawn further.
-- Brief each subagent completely; it does not see your conversation. Include: the exact question, scope (market, region, time range), what counts as a credible source, and the output path.
-- Make every subagent write its findings to `research/<task-slug>/<label>.md` (facts with source URLs, estimates marked as estimates, open questions) and reply with a summary of at most 10 lines.
-- Call pattern: `spawn(action="spawn", label="competitor-acme", task="<full brief>")` for each question, then `spawn(action="wait", timeout=600)`. The wait result only shows a short preview, so read each findings file with `read_file` before you synthesise.
-- If a subagent fails, retry once with a narrower brief or cover the gap yourself; record what is still unknown.
-- You own the final brief: verify key claims across the subagent files, remove duplicates, and cite only URLs that a subagent or you actually read.
+- Search first and fetch only the few pages that answer the question. Prefer official sites, filings, pricing pages and reputable reviews over aggregators.
+- After each fetch, write the facts you need (with the source URL, and estimates marked as estimates) to `research/<task-slug>/notes.md`, and carry on from your notes rather than from the page.
+- For a large task, work one question at a time (one competitor, one segment, one pricing model) and close each in the notes file before starting the next.
+- When the notes cover the question, stop fetching and write the brief from them.
 - Do not `web_fetch` image, video or PDF URLs (app screenshots, store images, logos). They contain no readable text.
+- If you run out of budget before the question is answered, deliver what the notes support and list what is still unknown.
