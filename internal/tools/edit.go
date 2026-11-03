@@ -223,7 +223,7 @@ func (t *EditTool) executeInSandbox(ctx context.Context, path, oldStr, newStr st
 		return ErrorResult(fmt.Sprintf("sandbox error: %v", err))
 	}
 
-	containerPath := ResolveSandboxPath(path, containerCwd)
+	containerPath := ResolveSandboxPath(MapHostPathToSandbox(path, mountWorkspace, containerCwd), containerCwd)
 
 	bridge := sandbox.NewFsBridge(sb.ID(), containerCwd)
 	content, err := bridge.ReadFile(ctx, containerPath)

@@ -236,7 +236,7 @@ func (t *ReadFileTool) executeInSandbox(ctx context.Context, path, sandboxKey st
 	if err != nil {
 		return ErrorResult(fmt.Sprintf("sandbox error: %v", err))
 	}
-	containerPath := ResolveSandboxPath(path, containerCwd)
+	containerPath := ResolveSandboxPath(MapHostPathToSandbox(path, mountWorkspace, containerCwd), containerCwd)
 
 	data, err := bridge.ReadFile(ctx, containerPath)
 	if err != nil {

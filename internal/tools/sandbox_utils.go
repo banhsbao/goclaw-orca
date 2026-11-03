@@ -164,6 +164,17 @@ func sandboxCwdForHostPath(hostCwd, mountWorkspace, containerBase string) (strin
 	return path.Join(filepath.ToSlash(containerBase), filepath.ToSlash(rel)), nil
 }
 
+func MapHostPathToSandbox(filePath, mountWorkspace, containerBase string) string {
+	if !strings.HasPrefix(filePath, "/") || mountWorkspace == "" {
+		return filePath
+	}
+	rel, err := filepath.Rel(filepath.Clean(mountWorkspace), filepath.Clean(filePath))
+	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
+		return filePath
+	}
+	return path.Join(filepath.ToSlash(containerBase), filepath.ToSlash(rel))
+}
+
 // ResolveSandboxPath resolves a tool-provided path (relative or absolute)
 // against the sandbox container CWD. Escapes are rejected to containerCwd so a
 // tool scoped to /workspace/agent-a cannot address /workspace/agent-b.

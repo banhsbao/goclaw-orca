@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -171,5 +172,15 @@ func TestFsBridgePathWithinUsesPathBoundaries(t *testing.T) {
 				t.Fatalf("fsBridgePathWithin(%q, %q) = %v, want %v", tt.root, tt.target, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestIsContainerNameConflict(t *testing.T) {
+	conflict := errors.New("docker run failed: exit status 125\nstderr: docker: Error response from daemon: Conflict. The container name \"/goclaw-sbx-x\" is already in use by container \"abc\".")
+	if !isContainerNameConflict(conflict) {
+		t.Fatal("expected conflict to be detected")
+	}
+	if isContainerNameConflict(errors.New("docker run failed: no such image")) || isContainerNameConflict(nil) {
+		t.Fatal("unexpected conflict detection")
 	}
 }

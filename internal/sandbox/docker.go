@@ -308,6 +308,13 @@ func (m *DockerManager) Get(
 	}
 	name := prefix + sanitizeKey(cacheKey)
 	sb, err := newDockerSandbox(ctx, name, cfg, workspace, readOnlyMounts...)
+	if err != nil && isContainerNameConflict(err) {
+		slog.Warn("sandbox container name in use by an untracked container, replacing it", "name", name)
+		if out, rmErr := exec.CommandContext(ctx, "docker", "rm", "-f", name).CombinedOutput(); rmErr != nil {
+			return nil, fmt.Errorf("remove stale sandbox container %s: %w (output: %s)", name, rmErr, strings.TrimSpace(string(out)))
+		}
+		sb, err = newDockerSandbox(ctx, name, cfg, workspace, readOnlyMounts...)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -463,6 +470,10 @@ func (m *DockerManager) Prune(ctx context.Context) {
 }
 
 // sanitizeKey makes a key safe for Docker container names.
+func isContainerNameConflict(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "is already in use by container")
+}
+
 func sanitizeKey(key string) string {
 	safe := strings.NewReplacer(
 		":", "-",

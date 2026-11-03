@@ -258,7 +258,7 @@ func (t *WriteFileTool) executeInSandbox(ctx context.Context, path, content, san
 	if err != nil {
 		return ErrorResult(fmt.Sprintf("sandbox error: %v", err))
 	}
-	containerPath := ResolveSandboxPath(path, containerCwd)
+	containerPath := ResolveSandboxPath(MapHostPathToSandbox(path, mountWorkspace, containerCwd), containerCwd)
 
 	if err := bridge.WriteFile(ctx, containerPath, content, appendMode); err != nil {
 		verb := "write"

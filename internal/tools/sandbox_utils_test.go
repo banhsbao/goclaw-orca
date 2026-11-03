@@ -143,3 +143,29 @@ func TestResolveSandboxPath(t *testing.T) {
 		})
 	}
 }
+
+func TestMapHostPathToSandbox(t *testing.T) {
+	mount := "/app/workspace/teams/team-1/chat-1"
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{"host path inside mount maps to container", mount + "/research/notes.md", "/workspace/research/notes.md"},
+		{"mount root maps to container base", mount, "/workspace"},
+		{"relative path unchanged", "notes.md", "notes.md"},
+		{"container path unchanged", "/workspace/notes.md", "/workspace/notes.md"},
+		{"sibling host path unchanged", "/app/workspace/teams/team-1/chat-2/x.md", "/app/workspace/teams/team-1/chat-2/x.md"},
+		{"prefix lookalike unchanged", mount + "-other/x.md", mount + "-other/x.md"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MapHostPathToSandbox(tt.path, mount, "/workspace"); got != tt.want {
+				t.Errorf("MapHostPathToSandbox(%q) = %q, want %q", tt.path, got, tt.want)
+			}
+		})
+	}
+	if got := ResolveSandboxPath(MapHostPathToSandbox(mount+"/a/b.md", mount, "/workspace"), "/workspace"); got != "/workspace/a/b.md" {
+		t.Errorf("resolved = %q", got)
+	}
+}
