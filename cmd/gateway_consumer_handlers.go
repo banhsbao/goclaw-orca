@@ -100,6 +100,7 @@ func handleSubagentAnnounce(
 	}
 
 	entry := subagentAnnounceEntry{
+		DelegationID: msg.Metadata["delegation_id"],
 		Label:        msg.Metadata[tools.MetaSubagentLabel],
 		Status:       msg.Metadata[tools.MetaSubagentStatus],
 		Content:      rawResult,
@@ -262,6 +263,7 @@ func handleTeammateMessage(
 	// The post-turn goroutine reads these flags to decide auto-complete vs skip.
 	taskActionFlags := &tools.TaskActionFlags{}
 	schedCtx := tools.WithTaskActionFlags(ctx, taskActionFlags)
+	unregisterFlags := tools.RegisterSessionTaskActionFlags(sessionKey, taskActionFlags)
 
 	outCh := deps.Sched.Schedule(schedCtx, scheduler.LaneTeam, agent.RunRequest{
 		SessionKey:      sessionKey,
@@ -310,117 +312,139 @@ func handleTeammateMessage(
 		}
 
 		outcome := <-outCh
+		unregisterFlags()
 
 		// Clean up task → session tracking now that the agent has finished.
 		if taskID != "" {
 			deps.TaskRunSessions.Delete(taskID)
 		}
 
+		finish := func(ctx context.Context, outcome scheduler.RunOutcome, flags *tools.TaskActionFlags) {
+			finishTeammateRun(ctx, deps, outcome, flags, origCh, origChatID, senderID, outMeta, inMeta)
+		}
+
+		if pending := taskActionFlags.AsyncDelegations(); len(pending) > 0 && inMeta[tools.MetaTeamTaskID] != "" &&
+			outcome.Failure() == nil && !taskActionFlags.Completed && !taskActionFlags.Escalated && !taskActionFlags.Reviewed {
+			deferTeamTaskUntilDelegations(ctx, pending, inMeta[tools.MetaTeamTaskID], inMeta[tools.MetaTeamID],
+				lockStop, outcome, taskActionFlags, finish)
+			return
+		}
+
 		// Stop lock renewal now that the agent has finished.
 		if lockStop != nil {
 			lockStop()
 		}
-
-		// Auto-complete/fail the associated team task (v2 only).
-		// Cache team lookup — reused later for announce routing.
-		var cachedTeam *store.TeamData
-		if taskIDStr := inMeta[tools.MetaTeamTaskID]; taskIDStr != "" {
-			teamTaskID, _ := uuid.Parse(taskIDStr)
-			teamID, _ := uuid.Parse(inMeta[tools.MetaTeamID])
-			if teamTaskID != uuid.Nil {
-				meta := teammateTaskMeta{
-					TaskID:   teamTaskID,
-					TeamID:   teamID,
-					ToAgent:  inMeta[tools.MetaToAgent],
-					Channel:  inMeta[tools.MetaOriginChannel],
-					ChatID:   inMeta[tools.MetaOriginChatID],
-					PeerKind: inMeta[tools.MetaOriginPeerKind],
-				}
-				cachedTeam = resolveTeamTaskOutcome(ctx, deps, outcome, taskActionFlags, meta)
-			}
-		}
-
-		// Build announce content from outcome + task comments/attachments.
-		announceContent, announceMedia, ok := buildTeammateAnnounce(ctx, outcome, senderID, inMeta, deps)
-		if !ok {
-			return
-		}
-
-		// Announce result (or failure) to lead agent via announce queue.
-		// Queue merges concurrent completions into a single batched announce.
-		if origChatID == "" {
-			slog.Warn("teammate announce: no origin_chat_id, cannot announce to lead")
-			return
-		}
-
-		leadAgent := resolveTeammateLeadAgent(ctx, cachedTeam, inMeta, deps)
-
-		origPeerKind := inMeta[tools.MetaOriginPeerKind]
-		if origPeerKind == "" {
-			origPeerKind = string(sessions.PeerDirect)
-		}
-		origLocalKey := inMeta[tools.MetaOriginLocalKey]
-		// Use exact origin session key if available (WS uses non-standard format).
-		leadSessionKey := inMeta[tools.MetaOriginSessionKey]
-		if leadSessionKey == "" {
-			// Fallback: rebuild session key from origin metadata (works for Telegram, Discord, etc.)
-			leadSessionKey = sessions.BuildScopedSessionKey(leadAgent, origCh, sessions.PeerKind(origPeerKind), origChatID)
-			leadSessionKey = overrideSessionKeyFromLocalKey(leadSessionKey, origLocalKey, leadAgent, origCh, origChatID, origPeerKind)
-		}
-
-		// Extract trace context for announce linking.
-		var parentTraceID, parentRootSpanID uuid.UUID
-		if tid := inMeta[tools.MetaOriginTraceID]; tid != "" {
-			parentTraceID, _ = uuid.Parse(tid)
-		}
-		if sid := inMeta[tools.MetaOriginRootSpanID]; sid != "" {
-			parentRootSpanID, _ = uuid.Parse(sid)
-		}
-
-		// Cap announce content to prevent context blowup for the leader agent.
-		if len([]rune(announceContent)) > 50_000 {
-			announceContent = string([]rune(announceContent)[:50_000]) + "\n[truncated]"
-		}
-
-		// Enqueue result. If we become the processor, run the announce loop.
-		entry := announceEntry{
-			MemberAgent:       inMeta[tools.MetaToAgent],
-			MemberDisplayName: inMeta[tools.MetaToAgentDisplay],
-			Content:           announceContent,
-			Media:             announceMedia,
-		}
-		isProcessor := enqueueAnnounce(leadSessionKey, entry)
-		if !isProcessor {
-			slog.Info("teammate announce: merged into pending batch",
-				"member", entry.MemberAgent, "session", leadSessionKey)
-			return
-		}
-
-		routing := announceRouting{
-			LeadAgent:      leadAgent,
-			LeadSessionKey: leadSessionKey,
-			OrigChannel:    origCh,
-			OrigChatID:     origChatID,
-			OrigPeerKind:   origPeerKind,
-			OrigLocalKey:   origLocalKey,
-			OriginUserID:   inMeta[tools.MetaOriginUserID],
-			// Carry the real acting sender + role through the team-task
-			// announce so the Lead's resumed turn doesn't lose attribution
-			// and trip group-scope permission checks. team_tool_dispatch.go
-			// already populates these fields in the dispatch metadata. (#915)
-			OriginSenderID:   inMeta[tools.MetaOriginSenderID],
-			OriginRole:       inMeta[tools.MetaOriginRole],
-			TeamID:           inMeta[tools.MetaTeamID],
-			TeamWorkspace:    inMeta[tools.MetaTeamWorkspace],
-			OriginTraceID:    inMeta[tools.MetaOriginTraceID],
-			ParentTraceID:    parentTraceID,
-			ParentRootSpanID: parentRootSpanID,
-			OutMeta:          outMeta,
-		}
-		processAnnounceLoop(ctx, routing, deps.Sched, deps.MsgBus, deps.TeamStore, deps.PostTurn, deps.Cfg, deps.ChannelMgr)
+		finish(ctx, outcome, taskActionFlags)
 	}(origChannel, origChatID, msg.SenderID, taskIDStr, outMeta, msg.Metadata)
 
 	return true
+}
+
+func finishTeammateRun(
+	ctx context.Context,
+	deps *ConsumerDeps,
+	outcome scheduler.RunOutcome,
+	taskActionFlags *tools.TaskActionFlags,
+	origCh, origChatID, senderID string,
+	outMeta, inMeta map[string]string,
+) {
+	// Auto-complete/fail the associated team task (v2 only).
+	// Cache team lookup — reused later for announce routing.
+	var cachedTeam *store.TeamData
+	if taskIDStr := inMeta[tools.MetaTeamTaskID]; taskIDStr != "" {
+		teamTaskID, _ := uuid.Parse(taskIDStr)
+		teamID, _ := uuid.Parse(inMeta[tools.MetaTeamID])
+		if teamTaskID != uuid.Nil {
+			meta := teammateTaskMeta{
+				TaskID:   teamTaskID,
+				TeamID:   teamID,
+				ToAgent:  inMeta[tools.MetaToAgent],
+				Channel:  inMeta[tools.MetaOriginChannel],
+				ChatID:   inMeta[tools.MetaOriginChatID],
+				PeerKind: inMeta[tools.MetaOriginPeerKind],
+			}
+			cachedTeam = resolveTeamTaskOutcome(ctx, deps, outcome, taskActionFlags, meta)
+		}
+	}
+
+	// Build announce content from outcome + task comments/attachments.
+	announceContent, announceMedia, ok := buildTeammateAnnounce(ctx, outcome, senderID, inMeta, deps)
+	if !ok {
+		return
+	}
+
+	// Announce result (or failure) to lead agent via announce queue.
+	// Queue merges concurrent completions into a single batched announce.
+	if origChatID == "" {
+		slog.Warn("teammate announce: no origin_chat_id, cannot announce to lead")
+		return
+	}
+
+	leadAgent := resolveTeammateLeadAgent(ctx, cachedTeam, inMeta, deps)
+
+	origPeerKind := inMeta[tools.MetaOriginPeerKind]
+	if origPeerKind == "" {
+		origPeerKind = string(sessions.PeerDirect)
+	}
+	origLocalKey := inMeta[tools.MetaOriginLocalKey]
+	// Use exact origin session key if available (WS uses non-standard format).
+	leadSessionKey := inMeta[tools.MetaOriginSessionKey]
+	if leadSessionKey == "" {
+		// Fallback: rebuild session key from origin metadata (works for Telegram, Discord, etc.)
+		leadSessionKey = sessions.BuildScopedSessionKey(leadAgent, origCh, sessions.PeerKind(origPeerKind), origChatID)
+		leadSessionKey = overrideSessionKeyFromLocalKey(leadSessionKey, origLocalKey, leadAgent, origCh, origChatID, origPeerKind)
+	}
+
+	// Extract trace context for announce linking.
+	var parentTraceID, parentRootSpanID uuid.UUID
+	if tid := inMeta[tools.MetaOriginTraceID]; tid != "" {
+		parentTraceID, _ = uuid.Parse(tid)
+	}
+	if sid := inMeta[tools.MetaOriginRootSpanID]; sid != "" {
+		parentRootSpanID, _ = uuid.Parse(sid)
+	}
+
+	// Cap announce content to prevent context blowup for the leader agent.
+	if len([]rune(announceContent)) > 50_000 {
+		announceContent = string([]rune(announceContent)[:50_000]) + "\n[truncated]"
+	}
+
+	// Enqueue result. If we become the processor, run the announce loop.
+	entry := announceEntry{
+		MemberAgent:       inMeta[tools.MetaToAgent],
+		MemberDisplayName: inMeta[tools.MetaToAgentDisplay],
+		Content:           announceContent,
+		Media:             announceMedia,
+	}
+	isProcessor := enqueueAnnounce(leadSessionKey, entry)
+	if !isProcessor {
+		slog.Info("teammate announce: merged into pending batch",
+			"member", entry.MemberAgent, "session", leadSessionKey)
+		return
+	}
+
+	routing := announceRouting{
+		LeadAgent:      leadAgent,
+		LeadSessionKey: leadSessionKey,
+		OrigChannel:    origCh,
+		OrigChatID:     origChatID,
+		OrigPeerKind:   origPeerKind,
+		OrigLocalKey:   origLocalKey,
+		OriginUserID:   inMeta[tools.MetaOriginUserID],
+		// Carry the real acting sender + role through the team-task
+		// announce so the Lead's resumed turn doesn't lose attribution
+		// and trip group-scope permission checks. team_tool_dispatch.go
+		// already populates these fields in the dispatch metadata. (#915)
+		OriginSenderID:   inMeta[tools.MetaOriginSenderID],
+		OriginRole:       inMeta[tools.MetaOriginRole],
+		TeamID:           inMeta[tools.MetaTeamID],
+		TeamWorkspace:    inMeta[tools.MetaTeamWorkspace],
+		OriginTraceID:    inMeta[tools.MetaOriginTraceID],
+		ParentTraceID:    parentTraceID,
+		ParentRootSpanID: parentRootSpanID,
+		OutMeta:          outMeta,
+	}
+	processAnnounceLoop(ctx, routing, deps.Sched, deps.MsgBus, deps.TeamStore, deps.PostTurn, deps.Cfg, deps.ChannelMgr)
 }
 
 // handleResetCommand processes /reset command: clears session history.
