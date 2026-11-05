@@ -152,7 +152,7 @@ func (p *ACPProvider) sessionReaper() {
 // resolveSession returns the ACP session ID for a goclaw session key.
 // It creates a new session if none exists, or reloads it after a process respawn.
 // A per-key mutex prevents concurrent creation races for the same session.
-func (p *ACPProvider) resolveSession(ctx context.Context, proc *acp.ACPProcess, goclawKey string, servers []acp.MCPServer) (string, error) {
+func (p *ACPProvider) resolveSession(ctx context.Context, proc *acp.ACPProcess, goclawKey string, servers []acp.MCPServer) (string, bool, error) {
 	actual, _ := p.sessionMu.LoadOrStore(goclawKey, &sync.Mutex{})
 	mu := actual.(*sync.Mutex)
 	mu.Lock()
@@ -164,7 +164,7 @@ func (p *ACPProvider) resolveSession(ctx context.Context, proc *acp.ACPProcess, 
 		if entry.proc == proc && entry.mcpKey == mcpKey {
 			// Same process instance: session is still live, just update last-used
 			entry.lastUsed = time.Now()
-			return entry.id, nil
+			return entry.id, false, nil
 		}
 		slog.Info("acp: restoring session",
 			"goclaw_session", goclawKey, "old_sid", entry.id, "respawned", entry.proc != proc)
@@ -173,7 +173,7 @@ func (p *ACPProvider) resolveSession(ctx context.Context, proc *acp.ACPProcess, 
 			if err == nil {
 				p.applySessionModel(ctx, proc, sid)
 				p.acpSessions.Store(goclawKey, &acpSessionEntry{id: sid, proc: proc, lastUsed: time.Now(), mcpKey: mcpKey})
-				return sid, nil
+				return sid, false, nil
 			}
 			slog.Warn("acp: session/load failed, creating new session", "old_sid", entry.id, "error", err)
 		}
@@ -187,11 +187,11 @@ func (p *ACPProvider) resolveSession(ctx context.Context, proc *acp.ACPProcess, 
 		sid, err = proc.NewSessionWithMeta(ctx, p.sessionMeta, nil)
 	}
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	p.applySessionModel(ctx, proc, sid)
 	p.acpSessions.Store(goclawKey, &acpSessionEntry{id: sid, proc: proc, lastUsed: time.Now(), mcpKey: mcpKey})
-	return sid, nil
+	return sid, true, nil
 }
 
 func (p *ACPProvider) applySessionModel(ctx context.Context, proc *acp.ACPProcess, sid string) {
@@ -232,7 +232,7 @@ func (p *ACPProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse,
 		return nil, fmt.Errorf("acp: spawn failed: %w", err)
 	}
 
-	acpSessionID, err := p.resolveSession(ctx, proc, sessionKey, p.mcpServers(req, sessionKey))
+	acpSessionID, fresh, err := p.resolveSession(ctx, proc, sessionKey, p.mcpServers(req, sessionKey))
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +240,7 @@ func (p *ACPProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse,
 		defer p.purgeSession(sessionKey)
 	}
 
-	content := extractACPContent(req)
+	content := extractACPContent(req, fresh)
 	if len(content) == 0 {
 		return nil, fmt.Errorf("acp: no user message in request")
 	}
@@ -288,7 +288,7 @@ func (p *ACPProvider) ChatStream(ctx context.Context, req ChatRequest, onChunk f
 		return nil, fmt.Errorf("acp: spawn failed: %w", err)
 	}
 
-	acpSessionID, err := p.resolveSession(ctx, proc, sessionKey, p.mcpServers(req, sessionKey))
+	acpSessionID, fresh, err := p.resolveSession(ctx, proc, sessionKey, p.mcpServers(req, sessionKey))
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +296,7 @@ func (p *ACPProvider) ChatStream(ctx context.Context, req ChatRequest, onChunk f
 		defer p.purgeSession(sessionKey)
 	}
 
-	content := extractACPContent(req)
+	content := extractACPContent(req, fresh)
 	if len(content) == 0 {
 		return nil, fmt.Errorf("acp: no user message in request")
 	}
@@ -452,7 +452,7 @@ func (p *ACPProvider) Close() error {
 }
 
 // extractACPContent extracts user message + images from ChatRequest into ACP ContentBlocks.
-func extractACPContent(req ChatRequest) []acp.ContentBlock {
+func extractACPContent(req ChatRequest, replayHistory bool) []acp.ContentBlock {
 	systemPrompt, userMsg, images := extractFromMessages(req.Messages)
 	if userMsg == "" {
 		return nil
@@ -462,8 +462,13 @@ func extractACPContent(req ChatRequest) []acp.ContentBlock {
 
 	// Prepend system prompt to user message (ACP agents have no separate system prompt API)
 	text := userMsg
+	if replayHistory {
+		if history := buildACPHistoryReplay(req.Messages); history != "" {
+			text = history + "\n\n" + text
+		}
+	}
 	if systemPrompt != "" {
-		text = systemPrompt + "\n\n" + userMsg
+		text = systemPrompt + "\n\n" + text
 	}
 	blocks = append(blocks, acp.ContentBlock{Type: "text", Text: text})
 
