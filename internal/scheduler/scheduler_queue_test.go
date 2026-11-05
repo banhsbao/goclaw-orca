@@ -464,3 +464,45 @@ func TestSessionQueue_InterruptMode(t *testing.T) {
 		t.Fatalf("r2 should complete successfully: %v", outcome.Err)
 	}
 }
+
+func TestSessionQueue_QueuedRunUsesOwnContext(t *testing.T) {
+	cfg := QueueConfig{
+		Mode:          QueueModeQueue,
+		Cap:           5,
+		Drop:          DropNew,
+		DebounceMs:    0,
+		MaxConcurrent: 1,
+	}
+
+	type ctxKey struct{}
+	blockCh := make(chan struct{})
+	seen := make(chan string, 2)
+	runFn := func(ctx context.Context, req agent.RunRequest) (*agent.RunResult, error) {
+		seen <- ctx.Value(ctxKey{}).(string)
+		if req.RunID == "r1" {
+			<-blockCh
+		}
+		return &agent.RunResult{}, nil
+	}
+
+	laneMgr := NewLaneManager([]LaneConfig{{Name: LaneMain, Concurrency: 10}})
+	sq := NewSessionQueue("test-session", LaneMain, cfg, laneMgr, runFn)
+
+	ch1 := sq.Enqueue(context.WithValue(context.Background(), ctxKey{}, "first"), agent.RunRequest{RunID: "r1", SessionKey: "s"})
+	if got := <-seen; got != "first" {
+		t.Fatalf("r1 ctx = %q, want first", got)
+	}
+	ch2 := sq.Enqueue(context.WithValue(context.Background(), ctxKey{}, "second"), agent.RunRequest{RunID: "r2", SessionKey: "s"})
+	close(blockCh)
+	<-ch1
+
+	select {
+	case got := <-seen:
+		if got != "second" {
+			t.Fatalf("queued r2 ran with ctx %q, want second", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("queued r2 never started")
+	}
+	<-ch2
+}

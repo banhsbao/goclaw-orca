@@ -189,5 +189,9 @@ func init() {
 		MsgSecureCLILabelInvalid:       "서버 레이블 %q이(가) 올바르지 않습니다: 소문자, 숫자, '-' 또는 '_' 1-32자를 사용하세요 (\"default\"는 예약어)",
 		MsgSecureCLILabelLimit:         "서버 레이블이 너무 많습니다: 최대 %d개",
 		MsgSecureCLIDescriptionTooLong: "설명이 너무 깁니다: 최대 %d자",
+		MsgAgyNotConfigured:            "Antigravity 런타임이 구성되지 않았습니다: %s",
+		MsgAgyNoLoginSession:           "진행 중인 Antigravity 로그인이 없습니다. 새 로그인을 시작하세요",
+		MsgAgyLoginFailed:              "Antigravity 로그인 실패: %s",
+		MsgAgyInvalidCode:              "잘못된 인증 코드",
 	})
 }

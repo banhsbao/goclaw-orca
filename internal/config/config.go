@@ -56,6 +56,7 @@ type Config struct {
 	Tts       TtsConfig       `json:"tts"`
 	Audio     *AudioConfig    `json:"audio,omitempty"` // optional STT/Music defaults (Phase 3/4)
 	Cron      CronConfig      `json:"cron"`
+	Delegate  DelegateConfig  `json:"delegate"`
 	Telemetry TelemetryConfig `json:"telemetry"`
 	Tailscale TailscaleConfig `json:"tailscale"`
 	Bindings  []AgentBinding  `json:"bindings,omitempty"`
@@ -544,6 +545,22 @@ type TelemetryConfig struct {
 	ModelPricing map[string]*ModelPricing `json:"model_pricing,omitempty"` // cost per model, key = "provider/model" or just "model"
 }
 
+type DelegateConfig struct {
+	RunTimeout string `json:"run_timeout,omitempty"`
+}
+
+func (dc DelegateConfig) RunTimeoutDuration() time.Duration {
+	if dc.RunTimeout == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(dc.RunTimeout)
+	if err != nil || d <= 0 {
+		slog.Warn("delegate: invalid run_timeout, using default", "value", dc.RunTimeout)
+		return 0
+	}
+	return d
+}
+
 // CronConfig configures the cron job system.
 type CronConfig struct {
 	MaxRetries      int    `json:"max_retries,omitempty"`      // max retry attempts on failure (default 3, 0 = no retry)
@@ -652,6 +669,7 @@ func (c *Config) ReplaceFrom(src *Config) {
 	c.Database = src.Database
 	c.Tts = src.Tts
 	c.Cron = src.Cron
+	c.Delegate = src.Delegate
 	c.Telemetry = src.Telemetry
 	c.Tailscale = src.Tailscale
 	c.Bindings = src.Bindings

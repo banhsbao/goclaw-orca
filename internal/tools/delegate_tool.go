@@ -79,6 +79,7 @@ type DelegateTool struct {
 	workspace      string
 	dataDir        string
 	removeExchange func(string, uuid.UUID) error
+	runTimeout     time.Duration
 
 	retainedMu     sync.Mutex
 	retained       map[string]retainedDelegationArtifact
@@ -108,6 +109,12 @@ func (t *DelegateTool) SetPostTurnProcessor(p PostTurnProcessor) { t.postTurn = 
 
 // SetHookDispatcher sets the hook dispatcher for SubagentStart/Stop events.
 func (t *DelegateTool) SetHookDispatcher(d hooks.Dispatcher) { t.hookDispatcher = d }
+
+func (t *DelegateTool) SetRunTimeout(d time.Duration) {
+	if d > 0 {
+		t.runTimeout = d
+	}
+}
 
 // SetWorkspace sets the global managed workspace used to derive canonical
 // tenant-scoped delegation exchanges. The caller's effective workspace is
@@ -175,6 +182,8 @@ func (t *DelegateTool) beginAsyncCompletion() (func(), bool) {
 	}, true
 }
 
+const DefaultDelegateRunTimeout = 30 * time.Minute
+
 // NewDelegateTool creates a delegate tool.
 func NewDelegateTool(links store.AgentLinkStore, agents store.AgentCRUDStore, eb eventbus.DomainEventBus, runFn DelegateRunFunc) *DelegateTool {
 	return NewDelegateToolWithAdmission(
@@ -202,6 +211,7 @@ func NewDelegateToolWithAdmission(
 		eventBus:        eb,
 		runFn:           runFn,
 		admission:       admission,
+		runTimeout:      DefaultDelegateRunTimeout,
 		retained:        make(map[string]retainedDelegationArtifact),
 		sweeperStop:     make(chan struct{}),
 		sweeperDone:     make(chan struct{}),
@@ -280,8 +290,8 @@ func (t *DelegateTool) Execute(ctx context.Context, args map[string]any) *Result
 	if ts, ok := args["timeout"].(float64); ok && int(ts) > 0 {
 		timeoutSec = int(ts)
 	}
-	if timeoutSec > 600 {
-		timeoutSec = 600 // hard cap to prevent resource exhaustion
+	if maxSec := int(t.runTimeout / time.Second); timeoutSec > maxSec {
+		timeoutSec = maxSec // hard cap to prevent resource exhaustion
 	}
 
 	if agentKey == "" || task == "" {
@@ -466,7 +476,7 @@ func (t *DelegateTool) executeAsyncMode(ctx context.Context, job *delegateArtifa
 		}
 	}()
 	// Detach from parent cancellation but keep a bounded admitted callback.
-	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Minute)
+	bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), t.runTimeout)
 	// The delegatee runs after the caller's turn has ended, so the caller's
 	// post-turn drain has already fired by the time it calls team_tasks. Give
 	// this run its own tracker, drained when the delegatee finishes, so tasks it

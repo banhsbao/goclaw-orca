@@ -251,8 +251,9 @@ function ProviderListView() {
           open={formOpen}
           onOpenChange={setFormOpen}
           onSubmit={async (data) => {
-            await createProvider(data);
+            const created = await createProvider(data);
             refresh();
+            return created;
           }}
           existingProviders={providers}
         />

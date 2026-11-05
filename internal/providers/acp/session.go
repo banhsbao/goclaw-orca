@@ -2,6 +2,7 @@ package acp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -22,12 +23,16 @@ func (p *ACPProcess) Initialize(ctx context.Context) error {
 		return fmt.Errorf("acp initialize: %w", err)
 	}
 	p.agentCaps = resp.Capabilities
-	slog.Info("acp: initialized", "agent", resp.AgentInfo.Name, "version", resp.AgentInfo.Version, "loadSession", resp.Capabilities.LoadSession)
+	slog.Info("acp: initialized", "agent", resp.AgentInfo.Name, "version", resp.AgentInfo.Version, "loadSession", resp.Capabilities.LoadSession, "mcpCaps", resp.Capabilities.MCPCapabilities)
 	return nil
 }
 
 // NewSession creates a new ACP session and returns its session ID.
 func (p *ACPProcess) NewSession(ctx context.Context) (string, error) {
+	return p.NewSessionWithMeta(ctx, nil, nil)
+}
+
+func (p *ACPProcess) NewSessionWithMeta(ctx context.Context, meta json.RawMessage, servers []MCPServer) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
@@ -38,13 +43,14 @@ func (p *ACPProcess) NewSession(ctx context.Context) (string, error) {
 
 	req := NewSessionRequest{
 		Cwd:        cwd,
-		McpServers: []string{},
+		McpServers: nonNilServers(servers),
+		Meta:       meta,
 	}
 	var resp NewSessionResponse
 	if err := p.conn.Call(ctx, "session/new", req, &resp); err != nil {
 		return "", fmt.Errorf("acp session/new: %w", err)
 	}
-	slog.Info("acp: session/new", "sid", resp.SessionID, "cwd", cwd)
+	slog.Info("acp: session/new", "sid", resp.SessionID, "cwd", cwd, "mcp_servers", len(servers))
 	return resp.SessionID, nil
 }
 
@@ -52,6 +58,10 @@ func (p *ACPProcess) NewSession(ctx context.Context) (string, error) {
 // Returns the session ID to use going forward (may equal the requested ID).
 // Only call if AgentCaps().LoadSession is true.
 func (p *ACPProcess) LoadSession(ctx context.Context, sessionID string) (string, error) {
+	return p.LoadSessionWithMeta(ctx, sessionID, nil, nil)
+}
+
+func (p *ACPProcess) LoadSessionWithMeta(ctx context.Context, sessionID string, meta json.RawMessage, servers []MCPServer) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
@@ -60,7 +70,7 @@ func (p *ACPProcess) LoadSession(ctx context.Context, sessionID string) (string,
 		cwd, _ = filepath.Abs(".")
 	}
 
-	req := LoadSessionRequest{SessionID: sessionID, Cwd: cwd}
+	req := LoadSessionRequest{SessionID: sessionID, Cwd: cwd, McpServers: nonNilServers(servers), Meta: meta}
 	var resp LoadSessionResponse
 	if err := p.conn.Call(ctx, "session/load", req, &resp); err != nil {
 		return "", fmt.Errorf("acp session/load: %w", err)
@@ -107,4 +117,22 @@ func (p *ACPProcess) Cancel(sessionID string) error {
 	return p.conn.Notify("session/cancel", CancelNotification{
 		SessionID: sessionID,
 	})
+}
+
+func (p *ACPProcess) SetModel(ctx context.Context, sessionID, modelID string) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	req := SetModelRequest{SessionID: sessionID, ModelID: modelID}
+	if err := p.conn.Call(ctx, "session/set_model", req, nil); err != nil {
+		return fmt.Errorf("acp session/set_model: %w", err)
+	}
+	return nil
+}
+
+func nonNilServers(servers []MCPServer) []MCPServer {
+	if servers == nil {
+		return []MCPServer{}
+	}
+	return servers
 }

@@ -115,7 +115,8 @@
     "perplexity": "Perplexity",
     "chatgpt_oauth": "ChatGPT Subscription (OAuth)",
     "yescale": "YesScale",
-    "acp": "ACP"
+    "acp": "ACP",
+    "antigravity_cli": "Antigravity CLI (Google account)"
   },
   "acp": {
     "description": "Orchestrate ACP-compatible coding agents as subprocesses. No API key needed.",
@@ -384,5 +385,24 @@
     "failedCreate": "Failed to create provider",
     "failedUpdate": "Failed to update provider",
     "failedDelete": "Failed to delete provider"
+  },
+  "antigravity": {
+    "description": "Sign in with your Google account to use Antigravity CLI. No API key needed.",
+    "createAndSignIn": "Create & sign in",
+    "getLink": "Get login link",
+    "openLink": "Open Google login",
+    "copyLink": "Copy link",
+    "codeLabel": "Authorization code",
+    "codePlaceholder": "Paste the code from Google",
+    "connect": "Connect",
+    "connected": "Connected",
+    "notConnected": "Not connected",
+    "relogin": "Re-login",
+    "preparing": "Preparing runtime (first time takes about 1 minute)...",
+    "model": "Model",
+    "modelSaved": "Model saved",
+    "modelSaveFailed": "Failed to save model",
+    "loginFailed": "Antigravity login failed",
+    "codeTimeout": "Timed out waiting for sign-in to complete"
   }
 }

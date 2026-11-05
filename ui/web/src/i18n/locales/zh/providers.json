@@ -129,7 +129,8 @@
     "perplexity": "Perplexity",
     "chatgpt_oauth": "ChatGPT Subscription (OAuth)",
     "yescale": "YesScale",
-    "acp": "ACP"
+    "acp": "ACP",
+    "antigravity_cli": "Antigravity CLI（Google 账号）"
   },
   "acp": {
     "description": "将兼容 ACP 的编程代理作为子进程进行编排。无需 API 密钥。",
@@ -406,5 +407,24 @@
     "failedCreate": "创建Provider失败",
     "failedUpdate": "更新Provider失败",
     "failedDelete": "删除Provider失败"
+  },
+  "antigravity": {
+    "description": "使用 Google 账号登录以使用 Antigravity CLI，无需 API 密钥。",
+    "createAndSignIn": "创建并登录",
+    "getLink": "获取登录链接",
+    "openLink": "打开 Google 登录",
+    "copyLink": "复制链接",
+    "codeLabel": "授权码",
+    "codePlaceholder": "粘贴 Google 提供的授权码",
+    "connect": "连接",
+    "connected": "已连接",
+    "notConnected": "未连接",
+    "relogin": "重新登录",
+    "preparing": "正在准备运行环境（首次约需 1 分钟）...",
+    "model": "模型",
+    "modelSaved": "模型已保存",
+    "modelSaveFailed": "保存模型失败",
+    "loginFailed": "Antigravity 登录失败",
+    "codeTimeout": "等待登录完成超时"
   }
 }

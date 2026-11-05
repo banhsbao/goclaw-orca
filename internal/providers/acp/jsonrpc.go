@@ -7,9 +7,37 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
+
+type inboundMessage struct {
+	ID     json.RawMessage `json:"id,omitempty"`
+	Method string          `json:"method,omitempty"`
+	Params json.RawMessage `json:"params,omitempty"`
+	Result json.RawMessage `json:"result,omitempty"`
+	Error  *jsonrpcError   `json:"error,omitempty"`
+}
+
+type outboundResponse struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      json.RawMessage `json:"id"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   *jsonrpcError   `json:"error,omitempty"`
+}
+
+func hasID(raw json.RawMessage) bool {
+	s := strings.TrimSpace(string(raw))
+	return s != "" && s != "null"
+}
+
+func parseNumericID(raw json.RawMessage) (int64, bool) {
+	s := strings.Trim(strings.TrimSpace(string(raw)), `"`)
+	id, err := strconv.ParseInt(s, 10, 64)
+	return id, err == nil
+}
 
 // jsonrpcMessage is the wire format for JSON-RPC 2.0 messages.
 type jsonrpcMessage struct {
@@ -77,24 +105,28 @@ func (c *Conn) readLoop() {
 			continue
 		}
 
-		var msg jsonrpcMessage
-		if err := json.Unmarshal(line, &msg); err != nil {
-			slog.Debug("acp.jsonrpc: skip malformed line", "error", err)
+		var in inboundMessage
+		if err := json.Unmarshal(line, &in); err != nil {
+			slog.Warn("acp.jsonrpc: skip malformed line", "error", err)
 			continue
 		}
+		msg := jsonrpcMessage{JSONRPC: "2.0", Method: in.Method, Params: in.Params, Result: in.Result, Error: in.Error}
 
 		switch {
-		case msg.ID != nil && msg.Method == "":
+		case hasID(in.ID) && in.Method == "":
 			// Response to our request — dispatch to pending caller
-			if ch, ok := c.pending.LoadAndDelete(*msg.ID); ok {
-				ch.(chan *jsonrpcMessage) <- &msg
+			if id, ok := parseNumericID(in.ID); ok {
+				msg.ID = &id
+				if ch, ok := c.pending.LoadAndDelete(id); ok {
+					ch.(chan *jsonrpcMessage) <- &msg
+				}
 			}
 
-		case msg.ID != nil && msg.Method != "":
+		case hasID(in.ID) && in.Method != "":
 			// Agent→client request — handle and respond
-			go c.handleRequest(&msg)
+			go c.handleRequest(in.ID, &msg)
 
-		case msg.ID == nil && msg.Method != "":
+		case !hasID(in.ID) && in.Method != "":
 			// Notification — dispatch to handler
 			if c.notify != nil {
 				c.notify(msg.Method, msg.Params)
@@ -111,10 +143,10 @@ func (c *Conn) readLoop() {
 // handleRequest processes an agent→client request and sends back the response.
 // Uses a context derived from the connection lifetime so long-running handlers
 // (e.g. waitForExit) are cancelled when the connection closes.
-func (c *Conn) handleRequest(msg *jsonrpcMessage) {
-	var resp jsonrpcMessage
+func (c *Conn) handleRequest(rawID json.RawMessage, msg *jsonrpcMessage) {
+	var resp outboundResponse
 	resp.JSONRPC = "2.0"
-	resp.ID = msg.ID
+	resp.ID = rawID
 
 	// Create a context that cancels when the connection's read loop exits.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -199,7 +231,7 @@ func (c *Conn) Notify(method string, params any) error {
 }
 
 // writeMessage marshals and writes a JSON-RPC message followed by a newline.
-func (c *Conn) writeMessage(msg *jsonrpcMessage) error {
+func (c *Conn) writeMessage(msg any) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return err

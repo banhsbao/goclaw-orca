@@ -61,6 +61,11 @@ func (h *ProvidersHandler) handleListProviderModels(w http.ResponseWriter, r *ht
 		return
 	}
 
+	if p.ProviderType == store.ProviderAntigravityCLI {
+		respond(antigravityModelInfos(r.Context(), p.ID))
+		return
+	}
+
 	// ACP agents don't need an API key — return hardcoded models
 	if p.ProviderType == store.ProviderACP {
 		respond(acpModels())

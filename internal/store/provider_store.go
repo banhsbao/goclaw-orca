@@ -31,6 +31,7 @@ const (
 	ProviderOllama          = "ollama"          // local or self-hosted Ollama (no API key)
 	ProviderOllamaCloud     = "ollama_cloud"    // Ollama Cloud (Bearer token required)
 	ProviderACP             = "acp"             // ACP (Agent Client Protocol) agent subprocess
+	ProviderAntigravityCLI  = "antigravity_cli" // Antigravity CLI (agy) in a per-provider Docker container
 	ProviderNovita          = "novita"          // Novita AI (OpenAI-compatible endpoint)
 	ProviderBytePlus        = "byteplus"        // BytePlus ModelArk (Seed 2.0 models)
 	ProviderBytePlusCoding  = "byteplus_coding" // BytePlus ModelArk Coding Plan
@@ -107,6 +108,7 @@ var ValidProviderTypes = map[string]bool{
 	ProviderOllama:          true,
 	ProviderOllamaCloud:     true,
 	ProviderACP:             true,
+	ProviderAntigravityCLI:  true,
 	ProviderNovita:          true,
 	ProviderBytePlus:        true,
 	ProviderBytePlusCoding:  true,
@@ -284,6 +286,7 @@ func normalizeProviderReasoningConfig(raw *ProviderReasoningConfig) *ProviderRea
 var NoEmbeddingTypes = map[string]bool{
 	ProviderAnthropicNative: true, // uses x-api-key auth, not Bearer; no embedding models
 	ProviderACP:             true,
+	ProviderAntigravityCLI:  true,
 	ProviderClaudeCLI:       true,
 	ProviderChatGPTOAuth:    true,
 	ProviderVertex:          true, // Vertex embeddings live on a different native endpoint, not on /endpoints/openapi

@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,20 +16,26 @@ import (
 
 // acpSessionEntry tracks a live ACP session for one goclaw conversation.
 type acpSessionEntry struct {
-	id       string       // ACP session ID returned by session/new or session/load
+	id       string          // ACP session ID returned by session/new or session/load
 	proc     *acp.ACPProcess // process that owns this session (for respawn detection)
 	lastUsed time.Time
+	mcpKey   string
 }
 
 // ACPProvider implements Provider by orchestrating ACP-compatible agent subprocesses.
 // One shared Gemini process is used; each goclaw conversation gets its own ACP session.
 type ACPProvider struct {
-	name         string
-	pool         *acp.ProcessPool
-	bridge       *acp.ToolBridge
-	defaultModel string
-	permMode     string
-	poolKey      string // key for the shared process in the pool (binary + args)
+	name          string
+	pool          *acp.ProcessPool
+	bridge        *acp.ToolBridge
+	defaultModel  string
+	permMode      string
+	poolKey       string // key for the shared process in the pool (binary + args)
+	sessionModel  string
+	sessionMeta   json.RawMessage
+	noClientTools bool
+	bridgeURL     string
+	bridgeToken   string
 
 	acpSessions sync.Map // goclawSessionKey → *acpSessionEntry
 	sessionMu   sync.Map // goclawSessionKey → *sync.Mutex (prevents concurrent session creation)
@@ -67,6 +74,18 @@ func WithACPPermMode(mode string) ACPOption {
 	}
 }
 
+func WithACPSessionMeta(meta json.RawMessage) ACPOption {
+	return func(p *ACPProvider) { p.sessionMeta = meta }
+}
+
+func WithACPSessionModel(model string) ACPOption {
+	return func(p *ACPProvider) { p.sessionModel = model }
+}
+
+func WithACPClientToolsDisabled() ACPOption {
+	return func(p *ACPProvider) { p.noClientTools = true }
+}
+
 // NewACPProvider creates a provider that orchestrates ACP agents as subprocesses.
 func NewACPProvider(binary string, args []string, workDir string, idleTTL time.Duration, denyPatterns []*regexp.Regexp, opts ...ACPOption) *ACPProvider {
 	// Pool key identifies the shared process: binary + args combination
@@ -91,6 +110,9 @@ func NewACPProvider(binary string, args []string, workDir string, idleTTL time.D
 	}
 	if p.permMode != "" {
 		bridgeOpts = append(bridgeOpts, acp.WithPermMode(p.permMode))
+	}
+	if p.noClientTools {
+		bridgeOpts = append(bridgeOpts, acp.WithClientToolsDisabled())
 	}
 	p.bridge = acp.NewToolBridge(workDir, bridgeOpts...)
 
@@ -130,26 +152,27 @@ func (p *ACPProvider) sessionReaper() {
 // resolveSession returns the ACP session ID for a goclaw session key.
 // It creates a new session if none exists, or reloads it after a process respawn.
 // A per-key mutex prevents concurrent creation races for the same session.
-func (p *ACPProvider) resolveSession(ctx context.Context, proc *acp.ACPProcess, goclawKey string) (string, error) {
+func (p *ACPProvider) resolveSession(ctx context.Context, proc *acp.ACPProcess, goclawKey string, servers []acp.MCPServer) (string, error) {
 	actual, _ := p.sessionMu.LoadOrStore(goclawKey, &sync.Mutex{})
 	mu := actual.(*sync.Mutex)
 	mu.Lock()
 	defer mu.Unlock()
 
+	mcpKey := mcpServersKey(servers)
 	if val, ok := p.acpSessions.Load(goclawKey); ok {
 		entry := val.(*acpSessionEntry)
-		if entry.proc == proc {
+		if entry.proc == proc && entry.mcpKey == mcpKey {
 			// Same process instance: session is still live, just update last-used
 			entry.lastUsed = time.Now()
 			return entry.id, nil
 		}
-		// Process was respawned — try to restore the session
-		slog.Info("acp: process respawned, attempting session restore",
-			"goclaw_session", goclawKey, "old_sid", entry.id)
+		slog.Info("acp: restoring session",
+			"goclaw_session", goclawKey, "old_sid", entry.id, "respawned", entry.proc != proc)
 		if proc.AgentCaps().LoadSession {
-			sid, err := proc.LoadSession(ctx, entry.id)
+			sid, err := proc.LoadSessionWithMeta(ctx, entry.id, p.sessionMeta, servers)
 			if err == nil {
-				p.acpSessions.Store(goclawKey, &acpSessionEntry{id: sid, proc: proc, lastUsed: time.Now()})
+				p.applySessionModel(ctx, proc, sid)
+				p.acpSessions.Store(goclawKey, &acpSessionEntry{id: sid, proc: proc, lastUsed: time.Now(), mcpKey: mcpKey})
 				return sid, nil
 			}
 			slog.Warn("acp: session/load failed, creating new session", "old_sid", entry.id, "error", err)
@@ -158,12 +181,26 @@ func (p *ACPProvider) resolveSession(ctx context.Context, proc *acp.ACPProcess, 
 	}
 
 	slog.Info("acp: creating new session", "goclaw_session", goclawKey, "pool_key", p.poolKey)
-	sid, err := proc.NewSession(ctx)
+	sid, err := proc.NewSessionWithMeta(ctx, p.sessionMeta, servers)
+	if err != nil && len(servers) > 0 {
+		slog.Warn("acp: session/new with MCP servers failed, retrying without tools", "provider", p.name, "error", err)
+		sid, err = proc.NewSessionWithMeta(ctx, p.sessionMeta, nil)
+	}
 	if err != nil {
 		return "", err
 	}
-	p.acpSessions.Store(goclawKey, &acpSessionEntry{id: sid, proc: proc, lastUsed: time.Now()})
+	p.applySessionModel(ctx, proc, sid)
+	p.acpSessions.Store(goclawKey, &acpSessionEntry{id: sid, proc: proc, lastUsed: time.Now(), mcpKey: mcpKey})
 	return sid, nil
+}
+
+func (p *ACPProvider) applySessionModel(ctx context.Context, proc *acp.ACPProcess, sid string) {
+	if p.sessionModel == "" {
+		return
+	}
+	if err := proc.SetModel(ctx, sid, p.sessionModel); err != nil {
+		slog.Warn("acp: set model failed", "provider", p.name, "model", p.sessionModel, "error", err)
+	}
 }
 
 func (p *ACPProvider) Name() string         { return p.name }
@@ -195,7 +232,7 @@ func (p *ACPProvider) Chat(ctx context.Context, req ChatRequest) (*ChatResponse,
 		return nil, fmt.Errorf("acp: spawn failed: %w", err)
 	}
 
-	acpSessionID, err := p.resolveSession(ctx, proc, sessionKey)
+	acpSessionID, err := p.resolveSession(ctx, proc, sessionKey, p.mcpServers(req, sessionKey))
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +288,7 @@ func (p *ACPProvider) ChatStream(ctx context.Context, req ChatRequest, onChunk f
 		return nil, fmt.Errorf("acp: spawn failed: %w", err)
 	}
 
-	acpSessionID, err := p.resolveSession(ctx, proc, sessionKey)
+	acpSessionID, err := p.resolveSession(ctx, proc, sessionKey, p.mcpServers(req, sessionKey))
 	if err != nil {
 		return nil, err
 	}

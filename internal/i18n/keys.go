@@ -392,4 +392,9 @@ const (
 	MsgSecureCLILabelInvalid       = "error.secure_cli_label_invalid"
 	MsgSecureCLILabelLimit         = "error.secure_cli_label_limit"
 	MsgSecureCLIDescriptionTooLong = "error.secure_cli_description_too_long"
+
+	MsgAgyNotConfigured  = "error.agy_not_configured"
+	MsgAgyNoLoginSession = "error.agy_no_login_session"
+	MsgAgyLoginFailed    = "error.agy_login_failed"
+	MsgAgyInvalidCode    = "error.agy_invalid_code"
 )

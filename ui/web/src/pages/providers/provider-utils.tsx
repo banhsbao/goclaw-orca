@@ -13,6 +13,7 @@ const SPECIAL_VARIANTS: Record<string, BadgeVariant> = {
   chatgpt_oauth: "default",
   claude_cli: "outline",
   acp: "outline",
+  antigravity_cli: "outline",
 };
 
 /** Derive badge labels from PROVIDER_TYPES constant (single source of truth). */

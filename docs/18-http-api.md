@@ -447,6 +447,9 @@ LLM provider management. API keys are encrypted with AES-256-GCM in the database
 | `GET` | `/v1/providers/{id}/codex-pool-activity` | Provider-level Codex pool activity |
 | `GET` | `/v1/embedding/status` | Check global embedding availability |
 | `GET` | `/v1/providers/claude-cli/auth-status` | Check Claude CLI login status |
+| `POST` | `/v1/providers/{id}/antigravity/login/start` | Start Antigravity CLI Google login (`antigravity_cli` providers). Returns `{"status":"preparing"}` while the runtime image builds (re-POST), `{"status":"pending","auth_url":...}`, or `{"status":"already_authenticated"}`. 503 when the runtime is not configured |
+| `POST` | `/v1/providers/{id}/antigravity/login/code` | Submit `{"code":"..."}`; returns `{"status":"authenticated"}` or `{"status":"pending"}` (poll auth-status). 409 when no login is in progress |
+| `GET` | `/v1/providers/{id}/antigravity/auth-status` | Returns `{"authenticated":bool}` from `agy models` |
 
 ### Model Pricing
 

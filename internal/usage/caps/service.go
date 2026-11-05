@@ -255,7 +255,7 @@ func (s *Service) resolveProvider(ctx context.Context, tenantID uuid.UUID, name 
 
 func ShouldEnforceProvider(providerType string, hasAPIKey bool) bool {
 	switch providerType {
-	case store.ProviderChatGPTOAuth, store.ProviderClaudeCLI, store.ProviderBailian, store.ProviderACP, store.ProviderOllama:
+	case store.ProviderChatGPTOAuth, store.ProviderClaudeCLI, store.ProviderBailian, store.ProviderACP, store.ProviderAntigravityCLI, store.ProviderOllama:
 		return false
 	default:
 		return hasAPIKey

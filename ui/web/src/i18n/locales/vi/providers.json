@@ -120,7 +120,8 @@
     "perplexity": "Perplexity",
     "chatgpt_oauth": "ChatGPT Subscription (OAuth)",
     "yescale": "YesScale",
-    "acp": "ACP"
+    "acp": "ACP",
+    "antigravity_cli": "Antigravity CLI (tài khoản Google)"
   },
   "acp": {
     "description": "Điều phối các agent lập trình tương thích ACP dưới dạng tiến trình con. Không cần API key.",
@@ -388,5 +389,24 @@
     "failedCreate": "Không thể tạo provider",
     "failedUpdate": "Không thể cập nhật provider",
     "failedDelete": "Không thể xóa provider"
+  },
+  "antigravity": {
+    "description": "Đăng nhập bằng tài khoản Google để dùng Antigravity CLI. Không cần API key.",
+    "createAndSignIn": "Tạo và đăng nhập",
+    "getLink": "Lấy liên kết đăng nhập",
+    "openLink": "Mở đăng nhập Google",
+    "copyLink": "Sao chép liên kết",
+    "codeLabel": "Mã xác thực",
+    "codePlaceholder": "Dán mã từ Google",
+    "connect": "Kết nối",
+    "connected": "Đã kết nối",
+    "notConnected": "Chưa kết nối",
+    "relogin": "Đăng nhập lại",
+    "preparing": "Đang chuẩn bị môi trường chạy (lần đầu mất khoảng 1 phút)...",
+    "model": "Mô hình",
+    "modelSaved": "Đã lưu mô hình",
+    "modelSaveFailed": "Không thể lưu mô hình",
+    "loginFailed": "Đăng nhập Antigravity thất bại",
+    "codeTimeout": "Hết thời gian chờ hoàn tất đăng nhập"
   }
 }

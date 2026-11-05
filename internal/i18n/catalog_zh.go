@@ -375,5 +375,9 @@ func init() {
 		MsgPackagesUpdatesReasonLocked:             "软件包数据库已锁定",
 		MsgPackagesUpdatesReasonDiskFull:           "磁盘已满",
 		MsgPackagesUpdatesReasonHelperUnavailable:  "特权助手不可用",
+		MsgAgyNotConfigured:                        "Antigravity 运行环境未配置：%s",
+		MsgAgyNoLoginSession:                       "当前没有进行中的 Antigravity 登录，请重新开始登录",
+		MsgAgyLoginFailed:                          "Antigravity 登录失败：%s",
+		MsgAgyInvalidCode:                          "授权码无效",
 	})
 }

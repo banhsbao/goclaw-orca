@@ -375,5 +375,9 @@ func init() {
 		MsgPackagesUpdatesReasonLocked:             "Cơ sở dữ liệu gói đang bị khóa",
 		MsgPackagesUpdatesReasonDiskFull:           "Đĩa đã đầy",
 		MsgPackagesUpdatesReasonHelperUnavailable:  "Dịch vụ đặc quyền không khả dụng",
+		MsgAgyNotConfigured:                        "Antigravity chưa được cấu hình: %s",
+		MsgAgyNoLoginSession:                       "Không có phiên đăng nhập Antigravity nào đang diễn ra; hãy bắt đầu đăng nhập mới",
+		MsgAgyLoginFailed:                          "Đăng nhập Antigravity thất bại: %s",
+		MsgAgyInvalidCode:                          "Mã xác thực không hợp lệ",
 	})
 }

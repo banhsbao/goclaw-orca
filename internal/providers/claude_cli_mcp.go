@@ -146,61 +146,18 @@ func (d *MCPConfigData) writeMCPConfigInternal(
 
 	// Build bridge entry with per-session agent context headers
 	if d.GatewayAddr != "" {
-		headers := make(map[string]string)
-		if d.GatewayToken != "" {
-			headers["Authorization"] = "Bearer " + d.GatewayToken
-		}
-		if agentID != "" && !strings.ContainsAny(agentID, "\r\n\x00") {
-			headers["X-Agent-ID"] = agentID
-		}
-		if userID != "" && !strings.ContainsAny(userID, "\r\n\x00") {
-			headers["X-User-ID"] = userID
-		}
-		if channel != "" && !strings.ContainsAny(channel, "\r\n\x00") {
-			headers["X-Channel"] = channel
-		}
-		if chatID != "" && !strings.ContainsAny(chatID, "\r\n\x00") {
-			headers["X-Chat-ID"] = chatID
-		}
-		if peerKind != "" && !strings.ContainsAny(peerKind, "\r\n\x00") {
-			headers["X-Peer-Kind"] = peerKind
-		}
-		if workspace != "" && !strings.ContainsAny(workspace, "\r\n\x00") {
-			headers["X-Workspace"] = workspace
-		}
-		if tenantID != "" && !strings.ContainsAny(tenantID, "\r\n\x00") {
-			headers["X-Tenant-ID"] = tenantID
-		}
-		if localKey != "" && !strings.ContainsAny(localKey, "\r\n\x00") {
-			headers["X-Local-Key"] = localKey
-		}
-		if sessionKey != "" && !strings.ContainsAny(sessionKey, "\r\n\x00") {
-			headers["X-Session-Key"] = sessionKey
-		}
-		if delegationID != "" && !strings.ContainsAny(delegationID, "\r\n\x00") {
-			headers["X-Delegation-ID"] = delegationID
-		}
-		if delegationInputs != "" && !strings.ContainsAny(delegationInputs, "\r\n\x00") {
-			headers["X-Delegation-Inputs"] = delegationInputs
-		}
-		// HMAC signature over all context fields to prevent header forgery
-		if d.GatewayToken != "" && (agentID != "" || userID != "") {
-			extra := []string{localKey, sessionKey}
-			if delegationID != "" || delegationInputs != "" {
-				extra = append(extra, delegationID, delegationInputs)
-			}
-			headers["X-Bridge-Sig"] = SignBridgeContext(
-				d.GatewayToken,
-				agentID,
-				userID,
-				channel,
-				chatID,
-				peerKind,
-				workspace,
-				tenantID,
-				extra...,
-			)
-		}
+		headers := BridgeHeaders(d.GatewayToken, sessionKey, BridgeContext{
+			AgentID:          agentID,
+			UserID:           userID,
+			Channel:          channel,
+			ChatID:           chatID,
+			PeerKind:         peerKind,
+			Workspace:        workspace,
+			TenantID:         tenantID,
+			LocalKey:         localKey,
+			DelegationID:     delegationID,
+			DelegationInputs: delegationInputs,
+		}, true)
 
 		bridgeEntry := map[string]any{
 			"url":  fmt.Sprintf("http://%s/mcp/bridge", d.GatewayAddr),

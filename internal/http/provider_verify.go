@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/i18n"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
+	"github.com/nextlevelbuilder/goclaw/internal/providers/antigravity"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 	usagecaps "github.com/nextlevelbuilder/goclaw/internal/usage/caps"
 )
@@ -59,6 +61,17 @@ func (h *ProvidersHandler) handleVerifyProvider(w http.ResponseWriter, r *http.R
 	p, err := h.store.GetProvider(r.Context(), id)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": i18n.T(locale, i18n.MsgNotFound, "provider", id.String())})
+		return
+	}
+
+	if p.ProviderType == store.ProviderAntigravityCLI {
+		_, err := antigravity.Models(r.Context(), p.ID)
+		if err != nil {
+			slog.Warn("providers.verify.antigravity", "provider", p.ID, "error", err)
+			writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": antigravity.ErrNotAuthenticated.Error()})
+		} else {
+			writeJSON(w, http.StatusOK, map[string]any{"valid": true})
+		}
 		return
 	}
 

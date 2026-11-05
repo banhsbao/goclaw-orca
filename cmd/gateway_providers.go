@@ -16,6 +16,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/oauth"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
+	"github.com/nextlevelbuilder/goclaw/internal/providers/antigravity"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
@@ -339,8 +340,8 @@ func registerProvidersFromDB(registry *providers.Registry, provStore store.Provi
 			continue
 		}
 		// ACP provider — no API key needed (agents manage their own auth).
-		if p.ProviderType == store.ProviderACP {
-			registerACPFromDB(registry, p, configuredShellDenyGroups(cfg))
+		if p.ProviderType == store.ProviderACP || p.ProviderType == store.ProviderAntigravityCLI {
+			registerACPFromDB(registry, p, configuredShellDenyGroups(cfg), gatewayConfigOf(cfg))
 			continue
 		}
 		// Local Ollama requires no API key — handle before the key guard (same pattern as ClaudeCLI).
@@ -614,7 +615,32 @@ func registerACPFromConfig(registry *providers.Registry, cfg config.ACPConfig, s
 }
 
 // registerACPFromDB registers an ACP provider from a DB provider row.
-func registerACPFromDB(registry *providers.Registry, p store.LLMProviderData, shellDenyGroups map[string]bool) {
+func registerACPFromDB(registry *providers.Registry, p store.LLMProviderData, shellDenyGroups map[string]bool, gw config.GatewayConfig) {
+	isAgy := p.ProviderType == store.ProviderAntigravityCLI
+	var settings struct {
+		Args     []string `json:"args"`
+		IdleTTL  string   `json:"idle_ttl"`
+		PermMode string   `json:"perm_mode"`
+		WorkDir  string   `json:"work_dir"`
+		Model    string   `json:"model"`
+	}
+	if p.Settings != nil {
+		if err := json.Unmarshal(p.Settings, &settings); err != nil {
+			slog.Warn("acp: invalid settings JSON, using defaults", "name", p.Name, "error", err)
+		}
+	}
+	idleTTL := 5 * time.Minute
+	if settings.IdleTTL != "" {
+		if d, err := time.ParseDuration(settings.IdleTTL); err == nil {
+			idleTTL = d
+		}
+	}
+
+	if isAgy {
+		registerAntigravityFromDB(registry, p, settings.Model, idleTTL, shellDenyGroups, gw)
+		return
+	}
+
 	binary := p.APIBase // repurpose api_base as binary path
 	if binary == "" {
 		slog.Warn("acp: no binary specified in DB provider", "name", p.Name)
@@ -628,24 +654,6 @@ func registerACPFromDB(registry *providers.Registry, p store.LLMProviderData, sh
 		slog.Warn("acp: binary not found, skipping", "binary", binary, "error", err)
 		return
 	}
-	// Parse settings JSONB for extra config
-	var settings struct {
-		Args     []string `json:"args"`
-		IdleTTL  string   `json:"idle_ttl"`
-		PermMode string   `json:"perm_mode"`
-		WorkDir  string   `json:"work_dir"`
-	}
-	if p.Settings != nil {
-		if err := json.Unmarshal(p.Settings, &settings); err != nil {
-			slog.Warn("acp: invalid settings JSON, using defaults", "name", p.Name, "error", err)
-		}
-	}
-	idleTTL := 5 * time.Minute
-	if settings.IdleTTL != "" {
-		if d, err := time.ParseDuration(settings.IdleTTL); err == nil {
-			idleTTL = d
-		}
-	}
 	workDir := settings.WorkDir
 	if workDir == "" {
 		workDir = defaultACPWorkDir()
@@ -656,6 +664,34 @@ func registerACPFromDB(registry *providers.Registry, p store.LLMProviderData, sh
 		providers.WithACPModel(p.Name),
 	))
 	slog.Info("registered provider from DB", "name", p.Name, "type", "acp")
+}
+
+func registerAntigravityFromDB(registry *providers.Registry, p store.LLMProviderData, model string, idleTTL time.Duration, shellDenyGroups map[string]bool, gw config.GatewayConfig) {
+	if err := antigravity.Ready(); err != nil {
+		slog.Warn("antigravity: runtime not configured, skipping", "name", p.Name, "error", err)
+		return
+	}
+	workDir := antigravity.WorkDir(config.ResolvedDataDirFromEnv(), p.ID)
+	defaultModel := model
+	if defaultModel == "" {
+		defaultModel = p.Name
+	}
+	bridgeURL := antigravityBridgeURL(p, gw)
+	opts := []providers.ACPOption{
+		providers.WithACPName(p.Name),
+		providers.WithACPModel(defaultModel),
+		providers.WithACPSessionModel(model),
+		providers.WithACPClientToolsDisabled(),
+		providers.WithACPSessionMeta(antigravity.SessionMeta(bridgeURL != "")),
+		providers.WithACPPermMode("approve-all"),
+	}
+	if bridgeURL != "" {
+		opts = append(opts, providers.WithACPMCPBridge(bridgeURL, gw.Token))
+	}
+	registry.RegisterForTenant(p.TenantID, providers.NewACPProvider(
+		"docker", antigravity.ACPArgs(p.ID, workDir), workDir, idleTTL, tools.ResolveDenyPatterns(shellDenyGroups), opts...,
+	))
+	slog.Info("registered provider from DB", "name", p.Name, "type", store.ProviderAntigravityCLI)
 }
 
 func configuredShellDenyGroups(cfg *config.Config) map[string]bool {
@@ -672,4 +708,29 @@ func configuredShellDenyPatterns(cfg *config.Config) []*regexp.Regexp {
 // defaultACPWorkDir returns the default workspace directory for ACP agents.
 func defaultACPWorkDir() string {
 	return filepath.Join(config.ResolvedDataDirFromEnv(), "acp-workspaces")
+}
+
+func antigravityBridgeURL(p store.LLMProviderData, gw config.GatewayConfig) string {
+	if gw.Token == "" || gw.Port == 0 {
+		slog.Warn("antigravity: gateway token or port missing, goclaw tools disabled", "name", p.Name)
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	url, err := antigravity.GatewayBridgeURL(ctx, gw.Port)
+	if err != nil {
+		slog.Warn("antigravity: gateway bridge unreachable, goclaw tools disabled", "name", p.Name, "error", err)
+		return ""
+	}
+	if err := antigravity.ConnectContainer(ctx, p.ID); err != nil {
+		slog.Warn("antigravity: connect container to gateway network failed", "name", p.Name, "error", err)
+	}
+	return url
+}
+
+func gatewayConfigOf(cfg *config.Config) config.GatewayConfig {
+	if cfg == nil {
+		return config.GatewayConfig{}
+	}
+	return cfg.Gateway
 }

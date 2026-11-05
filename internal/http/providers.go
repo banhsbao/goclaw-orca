@@ -24,6 +24,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/oauth"
 	"github.com/nextlevelbuilder/goclaw/internal/permissions"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
+	"github.com/nextlevelbuilder/goclaw/internal/providers/antigravity"
 	"github.com/nextlevelbuilder/goclaw/internal/security"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
@@ -47,11 +48,13 @@ type ProvidersHandler struct {
 	agents          store.AgentCRUDStore    // optional: for provider pool activity agent lookup
 	modelReg        providers.ModelRegistry // optional: forward-compat model resolver for Anthropic
 	usageCaps       *usagecaps.Service
+	agyLogin        *antigravity.LoginManager
+	agyAuth         agyAuthCache
 }
 
 // NewProvidersHandler creates a handler for provider management endpoints.
 func NewProvidersHandler(s store.ProviderStore, secretStore store.ConfigSecretsStore, providerReg *providers.Registry, gatewayAddr string) *ProvidersHandler {
-	return &ProvidersHandler{store: s, secretStore: secretStore, providerReg: providerReg, gatewayAddr: gatewayAddr}
+	return &ProvidersHandler{store: s, secretStore: secretStore, providerReg: providerReg, gatewayAddr: gatewayAddr, agyLogin: antigravity.NewLoginManager()}
 }
 
 // SetMessageBus sets the message bus for audit event broadcasting.
@@ -97,6 +100,10 @@ func (h *ProvidersHandler) SetAgentStore(as store.AgentCRUDStore) {
 // for model alias resolution and token counting. Must be called before serving requests.
 func (h *ProvidersHandler) SetModelRegistry(r providers.ModelRegistry) {
 	h.modelReg = r
+}
+
+func (h *ProvidersHandler) SetAntigravityLoginManager(m *antigravity.LoginManager) {
+	h.agyLogin = m
 }
 
 func (h *ProvidersHandler) SetUsageCapService(s *usagecaps.Service) {
@@ -183,6 +190,8 @@ func (h *ProvidersHandler) RegisterRoutes(mux *http.ServeMux) {
 
 	// Claude CLI auth status (global — not per-provider; read-only status)
 	mux.HandleFunc("GET /v1/providers/claude-cli/auth-status", h.readAuth(h.handleClaudeCLIAuthStatus))
+
+	h.registerAntigravityRoutes(mux)
 }
 
 // auth gates provider mutations at Admin.
@@ -225,7 +234,7 @@ func (h *ProvidersHandler) registerInMemory(p *store.LLMProviderData) providerRu
 	}
 	// ACP agents don't need an API key — skip in-memory registration
 	// (ACP providers are registered via gateway_providers.go on startup or restart)
-	if p.ProviderType == store.ProviderACP {
+	if p.ProviderType == store.ProviderACP || p.ProviderType == store.ProviderAntigravityCLI {
 		return providerRuntimeSkipped
 	}
 	// Claude CLI doesn't need an API key — register immediately
@@ -509,6 +518,9 @@ func validateProviderURL(rawURL string, providerType string) error {
 	if providerType == store.ProviderClaudeCLI {
 		return validateClaudeCLIExecutablePath(rawURL)
 	}
+	if providerType == store.ProviderAntigravityCLI {
+		return fmt.Errorf("api_base must be empty for antigravity_cli providers")
+	}
 	if providerType == store.ProviderACP {
 		return validateACPExecutablePath(rawURL)
 	}
@@ -678,6 +690,15 @@ func (h *ProvidersHandler) handleCreateProvider(w http.ResponseWriter, r *http.R
 
 	if err := validateChatGPTOAuthProviderCandidate(r.Context(), h.store, uuid.Nil, &p); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := validatePermMode(&p); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": i18n.T(locale, i18n.MsgInvalidRequest, err.Error())})
+		return
+	}
+	if existing, err := h.store.GetProviderByName(r.Context(), p.Name); err == nil && existing.ProviderType != p.ProviderType &&
+		(existing.ProviderType == store.ProviderAntigravityCLI || p.ProviderType == store.ProviderAntigravityCLI) {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": i18n.T(locale, i18n.MsgAlreadyExists, "provider", p.Name)})
 		return
 	}
 	if err := validateProviderEmbeddingSettings(&p); err != nil {
@@ -856,6 +877,10 @@ func (h *ProvidersHandler) handleUpdateProvider(w http.ResponseWriter, r *http.R
 	// When provider_type changes, existing api_base must also pass validation
 	// for the new type — prevents SSRF via ACP→non-ACP type switch.
 	typeChanged := candidate.ProviderType != currentProvider.ProviderType
+	if typeChanged && (candidate.ProviderType == store.ProviderAntigravityCLI || currentProvider.ProviderType == store.ProviderAntigravityCLI) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": i18n.T(locale, i18n.MsgInvalidRequest, "provider_type cannot be changed to or from antigravity_cli")})
+		return
+	}
 
 	if apiBase, ok := updates["api_base"]; ok {
 		if s, _ := apiBase.(string); s != "" {
@@ -887,6 +912,10 @@ func (h *ProvidersHandler) handleUpdateProvider(w http.ResponseWriter, r *http.R
 
 	if err := validateChatGPTOAuthProviderCandidate(r.Context(), h.store, id, &candidate); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := validatePermMode(&candidate); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": i18n.T(locale, i18n.MsgInvalidRequest, err.Error())})
 		return
 	}
 	if err := validateProviderEmbeddingSettings(&candidate); err != nil {
@@ -943,10 +972,12 @@ func (h *ProvidersHandler) handleDeleteProvider(w http.ResponseWriter, r *http.R
 
 	// Read provider before deleting so we can unregister it
 	var providerName string
+	var providerType string
 	var providerTenantID uuid.UUID
 	if p, err := h.store.GetProvider(r.Context(), id); err == nil {
 		providerName = p.Name
 		providerTenantID = p.TenantID
+		providerType = p.ProviderType
 	}
 
 	if err := h.store.DeleteProvider(r.Context(), id); err != nil {
@@ -960,6 +991,10 @@ func (h *ProvidersHandler) handleDeleteProvider(w http.ResponseWriter, r *http.R
 	}
 	if providerName != "" {
 		h.emitProviderCacheInvalidate(r.Context(), providerTenantID, providerName)
+	}
+
+	if providerType == store.ProviderAntigravityCLI {
+		h.cleanupAntigravity(r.Context(), id)
 	}
 
 	emitAudit(h.msgBus, r, "provider.deleted", "provider", id.String())

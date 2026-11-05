@@ -246,7 +246,7 @@ func (s *Server) BuildMux() *http.ServeMux {
 	if s.tools != nil {
 		if s.cfg.Gateway.Token != "" {
 			bridgeHandler := mcpbridge.NewBridgeServer(s.tools, "1.0.0", s.msgBus, s.toolPolicy)
-			handler := tokenAuthMiddleware(s.cfg.Gateway.Token,
+			handler := bridgeAuthMiddleware(s.cfg.Gateway.Token,
 				bridgeContextMiddleware(s.cfg.Gateway.Token, s.agentStore, bridgeHandler))
 			mux.Handle("/mcp/bridge", handler)
 		} else {
@@ -502,6 +502,18 @@ func bridgeContextMiddleware(gatewayToken string, agentStore store.AgentStore, n
 		}
 
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func bridgeAuthMiddleware(token string, next http.Handler) http.Handler {
+	bearer := tokenAuthMiddleware(token, next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "" && r.Header.Get("X-Bridge-Sig") != "" &&
+			(r.Header.Get("X-Agent-ID") != "" || r.Header.Get("X-User-ID") != "") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		bearer.ServeHTTP(w, r)
 	})
 }
 

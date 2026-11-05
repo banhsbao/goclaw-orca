@@ -58,7 +58,7 @@ export function ProviderAdvancedDialog({
   const isACP = provider.provider_type === "acp";
   const isCLI = provider.provider_type === "claude_cli";
   const isOAuth = provider.provider_type === "chatgpt_oauth";
-  const isStandard = !isACP && !isCLI && !isOAuth;
+  const isStandard = !isACP && !isCLI && !isOAuth && provider.provider_type !== "antigravity_cli";
 
   const typeInfo = PROVIDER_TYPES.find((pt) => pt.value === provider.provider_type);
 

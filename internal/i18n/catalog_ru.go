@@ -374,5 +374,9 @@ func init() {
 		MsgSecureCLILabelInvalid:                   "недопустимая метка сервера %q: используйте 1-32 строчных букв, цифр, '-' или '_' (\"default\" зарезервировано)",
 		MsgSecureCLILabelLimit:                     "слишком много меток сервера: максимум %d",
 		MsgSecureCLIDescriptionTooLong:             "описание слишком длинное: максимум %d символов",
+		MsgAgyNotConfigured:                        "Среда Antigravity не настроена: %s",
+		MsgAgyNoLoginSession:                       "Вход в Antigravity не выполняется; начните новый вход",
+		MsgAgyLoginFailed:                          "Не удалось войти в Antigravity: %s",
+		MsgAgyInvalidCode:                          "Недействительный код авторизации",
 	})
 }

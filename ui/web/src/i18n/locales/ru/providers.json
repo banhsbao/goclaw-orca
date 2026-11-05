@@ -115,7 +115,8 @@
     "perplexity": "Perplexity",
     "chatgpt_oauth": "Подписка ChatGPT (OAuth)",
     "yescale": "YesScale",
-    "acp": "ACP"
+    "acp": "ACP",
+    "antigravity_cli": "Antigravity CLI (аккаунт Google)"
   },
   "acp": {
     "description": "Оркестрация ACP-совместимых агентов кодирования в виде подпроцессов. Ключ API не требуется.",
@@ -384,5 +385,24 @@
     "failedCreate": "Не удалось создать провайдера",
     "failedUpdate": "Не удалось обновить провайдера",
     "failedDelete": "Не удалось удалить провайдера"
+  },
+  "antigravity": {
+    "description": "Войдите через аккаунт Google, чтобы использовать Antigravity CLI. API-ключ не нужен.",
+    "createAndSignIn": "Создать и войти",
+    "getLink": "Получить ссылку для входа",
+    "openLink": "Открыть вход Google",
+    "copyLink": "Копировать ссылку",
+    "codeLabel": "Код авторизации",
+    "codePlaceholder": "Вставьте код от Google",
+    "connect": "Подключить",
+    "connected": "Подключено",
+    "notConnected": "Не подключено",
+    "relogin": "Войти заново",
+    "preparing": "Подготовка среды (в первый раз около 1 минуты)...",
+    "model": "Модель",
+    "modelSaved": "Модель сохранена",
+    "modelSaveFailed": "Не удалось сохранить модель",
+    "loginFailed": "Не удалось войти в Antigravity",
+    "codeTimeout": "Время ожидания входа истекло"
   }
 }

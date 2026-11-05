@@ -152,7 +152,7 @@ export function StepProvider({ onComplete, existingProvider }: StepProviderProps
               <Select value={providerType} onValueChange={handleTypeChange}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PROVIDER_TYPES.map((t) => (
+                  {PROVIDER_TYPES.filter((t) => t.value !== "antigravity_cli").map((t) => (
                     <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                   ))}
                 </SelectContent>

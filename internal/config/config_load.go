@@ -407,6 +407,7 @@ func (c *Config) applyEnvOverrides() {
 
 	// Cron job execution
 	envStr("GOCLAW_CRON_JOB_TIMEOUT", &c.Cron.JobTimeout)
+	envStr("GOCLAW_DELEGATE_RUN_TIMEOUT", &c.Delegate.RunTimeout)
 }
 
 // Save writes the config to a JSON file.

@@ -375,5 +375,9 @@ func init() {
 		MsgPackagesUpdatesReasonLocked:             "Package database is locked",
 		MsgPackagesUpdatesReasonDiskFull:           "Disk full",
 		MsgPackagesUpdatesReasonHelperUnavailable:  "Privileged helper unavailable",
+		MsgAgyNotConfigured:                        "Antigravity runtime is not configured: %s",
+		MsgAgyNoLoginSession:                       "No Antigravity login in progress; start a new login",
+		MsgAgyLoginFailed:                          "Antigravity login failed: %s",
+		MsgAgyInvalidCode:                          "Invalid authorization code",
 	})
 }

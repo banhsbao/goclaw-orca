@@ -1,0 +1,32 @@
+# Optional: one Antigravity CLI (agy) container per Google account.
+# goclaw reaches them via `docker exec -i agy-accN agy acp` (wrapper in /app/data/bin).
+#
+# Usage:
+#   docker compose -p goclaw-agy -f docker-compose.agy.yml up -d --build
+#   docker exec -it agy-acc1 agy        # then /login once per account
+
+x-agy: &agy
+  build:
+    dockerfile_inline: |
+      FROM debian:bookworm-slim
+      RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git && rm -rf /var/lib/apt/lists/* && mkdir -p /home/agy && chown 1000:1000 /home/agy
+  command: sleep infinity
+  restart: unless-stopped
+  user: "1000:1000"
+  environment:
+    HOME: /home/agy
+
+services:
+  agy-acc1:
+    <<: *agy
+    container_name: agy-acc1
+    volumes:
+      - ${HOME}/.local/bin/agy:/usr/local/bin/agy:ro
+      - agy-acc1-home:/home/agy
+      - goclaw-data:/app/data
+
+volumes:
+  agy-acc1-home:
+  goclaw-data:
+    external: true
+    name: goclaw-orca_goclaw-data

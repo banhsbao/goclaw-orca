@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -28,6 +28,7 @@ import { DEFAULT_CODEX_OAUTH_ALIAS, PROVIDER_TYPES, suggestUniqueProviderAlias }
 import { OAuthSection } from "./provider-oauth-section";
 import { CLISection } from "./provider-cli-section";
 import { ACPSection } from "./provider-acp-section";
+import { AntigravityLoginSection } from "./provider-antigravity-section";
 import { ProviderStandardFormFields } from "./provider-standard-form-fields";
 import { Loader2 } from "lucide-react";
 import { providerCreateSchema, type ProviderCreateFormData } from "@/schemas/provider.schema";
@@ -70,10 +71,13 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
   const isOAuth = providerType === "chatgpt_oauth";
   const isCLI = providerType === "claude_cli";
   const isACP = providerType === "acp";
+  const isAgy = providerType === "antigravity_cli";
+  const [created, setCreated] = useState<ProviderData | null>(null);
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
+      setCreated(null);
       reset({
         name: "",
         displayName: "",
@@ -109,11 +113,20 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
       if (Object.keys(settings).length > 0) payload.settings = settings;
     }
 
+    if (isAgy) {
+      payload.api_base = undefined;
+      payload.settings = { perm_mode: "approve-all" };
+    }
+
     if (data.apiKey && data.apiKey !== "***") {
       payload.api_key = data.apiKey;
     }
 
-    await onSubmit(payload);
+    const result = await onSubmit(payload);
+    if (isAgy && result && typeof result === "object" && "id" in result) {
+      setCreated(result as ProviderData);
+      return;
+    }
     onOpenChange(false);
   };
 
@@ -135,7 +148,7 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
       <DialogContent className="flex max-h-[85vh] flex-col">
         <DialogHeader>
           <DialogTitle>{t("form.createTitle")}</DialogTitle>
-          <DialogDescription>{isOAuth ? t("form.configureOauth") : t("form.configure")}</DialogDescription>
+          <DialogDescription>{isOAuth ? t("form.configureOauth") : isAgy ? t("antigravity.description") : t("form.configure")}</DialogDescription>
         </DialogHeader>
         <div className="-mx-4 min-h-0 overflow-y-auto px-4 py-4 sm:-mx-6 sm:px-6 space-y-4">
           <ProviderTypeSelect
@@ -144,6 +157,7 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
             alreadyAddedLabel={t("form.alreadyAdded")}
             providerTypeLabel={t("form.providerType")}
             onChange={handleProviderTypeChange}
+            disabled={!!created}
           />
 
           {isOAuth ? (
@@ -184,6 +198,7 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
                   <Label htmlFor="name">{t("form.name")}</Label>
                   <Input
                     id="name"
+                    disabled={!!created}
                     {...register("name")}
                     onChange={(e) => setValue("name", slugify(e.target.value), { shouldValidate: true })}
                     placeholder={t("form.namePlaceholder")}
@@ -199,6 +214,7 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
                   <Label htmlFor="displayName">{t("form.displayName")}</Label>
                   <Input
                     id="displayName"
+                    disabled={!!created}
                     {...register("displayName")}
                     placeholder={t("form.displayNamePlaceholder")}
                     className="text-base md:text-sm"
@@ -223,7 +239,15 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
                 />
               )}
 
-              {!isCLI && !isACP && (
+              {isAgy && created && (
+                <AntigravityLoginSection
+                  providerId={created.id}
+                  settings={created.settings}
+                  onClose={() => onOpenChange(false)}
+                />
+              )}
+
+              {!isCLI && !isACP && !isAgy && (
                 <ProviderStandardFormFields
                   register={register}
                   errors={errors}
@@ -255,9 +279,9 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-            {isOAuth ? t("form.close") : t("form.cancel")}
+            {isOAuth || created ? t("form.close") : t("form.cancel")}
           </Button>
-          {!isOAuth && (
+          {!isOAuth && !created && (
             <Button
               onClick={handleSubmit(onFormSubmit, (errs) => {
                 // surface first field error as root error for display
@@ -268,7 +292,7 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
               className="gap-1"
             >
               {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {isSubmitting ? t("form.creating") : t("form.create")}
+              {isSubmitting ? t("form.creating") : isAgy ? t("antigravity.createAndSignIn") : t("form.create")}
             </Button>
           )}
         </DialogFooter>
@@ -277,7 +301,8 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
   );
 }
 
-function ProviderTypeSelect({ value, hasClaudeCLI, alreadyAddedLabel, providerTypeLabel, onChange }: {
+function ProviderTypeSelect({ value, hasClaudeCLI, alreadyAddedLabel, providerTypeLabel, onChange, disabled }: {
+  disabled?: boolean;
   value: string;
   hasClaudeCLI: boolean;
   alreadyAddedLabel: string;
@@ -287,7 +312,7 @@ function ProviderTypeSelect({ value, hasClaudeCLI, alreadyAddedLabel, providerTy
   return (
     <div className="space-y-2">
       <Label>{providerTypeLabel}</Label>
-      <Select value={value} onValueChange={onChange}>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger>
           <SelectValue />
         </SelectTrigger>

@@ -473,6 +473,9 @@ func wireExtras(
 			}, nil
 		}
 		delegateTool := tools.NewDelegateToolWithAdmission(stores.AgentLinks, stores.Agents, domainBus, delegateRunFn, childRunAdmission)
+		if d := appCfg.Delegate.RunTimeoutDuration(); d > 0 {
+			delegateTool.SetRunTimeout(d)
+		}
 		delegateTool.SetDataDir(appCfg.DataDir)
 		delegateTool.SetWorkspace(workspace)
 		delegateTool.SetMsgBus(msgBus)
@@ -730,7 +733,7 @@ func wireExtras(
 			// Provider was deleted or not found — already unregistered by handler
 			return
 		}
-		if p.ProviderType != store.ProviderACP {
+		if p.ProviderType != store.ProviderACP && p.ProviderType != store.ProviderAntigravityCLI {
 			return
 		}
 		// Unregister old instance (closes ProcessPool) then re-register
@@ -740,7 +743,7 @@ func wireExtras(
 		}
 		providerReg.UnregisterForTenant(tenantID, p.Name)
 		if p.Enabled {
-			registerACPFromDB(providerReg, *p, configuredShellDenyGroups(appCfg))
+			registerACPFromDB(providerReg, *p, configuredShellDenyGroups(appCfg), gatewayConfigOf(appCfg))
 		}
 	})
 

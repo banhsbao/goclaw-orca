@@ -22,6 +22,7 @@ type ToolBridge struct {
 	permMode       string // "approve-all" (default), "approve-reads", "deny-all"
 	nextTermID     atomic.Int64
 	maxOutputBytes int
+	noClientTools  bool
 }
 
 // ToolBridgeOption configures a ToolBridge.
@@ -41,6 +42,10 @@ func WithPermMode(mode string) ToolBridgeOption {
 	}
 }
 
+func WithClientToolsDisabled() ToolBridgeOption {
+	return func(tb *ToolBridge) { tb.noClientTools = true }
+}
+
 // NewToolBridge creates a tool bridge sandboxed to the given workspace.
 func NewToolBridge(workspace string, opts ...ToolBridgeOption) *ToolBridge {
 	tb := &ToolBridge{
@@ -57,6 +62,10 @@ func NewToolBridge(workspace string, opts ...ToolBridgeOption) *ToolBridge {
 // Handle dispatches agent→client requests by method name.
 // Implements the RequestHandler signature for Conn.
 func (tb *ToolBridge) Handle(ctx context.Context, method string, params json.RawMessage) (any, error) {
+	if tb.noClientTools && (strings.HasPrefix(method, "fs/") || strings.HasPrefix(method, "terminal/")) {
+		slog.Warn("security.acp_client_tool_blocked", "method", method)
+		return nil, fmt.Errorf("client tools disabled: %s", method)
+	}
 	switch method {
 	case "fs/readTextFile":
 		if tb.permMode == "deny-all" {
@@ -118,6 +127,15 @@ func (tb *ToolBridge) Handle(ctx context.Context, method string, params json.Raw
 			return nil, fmt.Errorf("invalid params: %w", err)
 		}
 		return tb.handlePermission(req)
+	case "session/request_permission":
+		if !tb.noClientTools {
+			return nil, fmt.Errorf("unknown method: %s", method)
+		}
+		var req SessionPermissionRequest
+		if err := json.Unmarshal(params, &req); err != nil {
+			return nil, fmt.Errorf("invalid params: %w", err)
+		}
+		return tb.handleSessionPermission(req), nil
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)
 	}
@@ -168,6 +186,44 @@ func (tb *ToolBridge) handlePermission(req RequestPermissionRequest) (*RequestPe
 	default: // "approve-all" or unknown → approve
 		return &RequestPermissionResponse{Outcome: "approved"}, nil
 	}
+}
+
+func isReadOnlyTool(name string) bool {
+	lower := strings.ToLower(name)
+	for _, k := range []string{"read", "glob", "grep", "search", "list", "view"} {
+		if strings.Contains(lower, k) {
+			return true
+		}
+	}
+	return false
+}
+
+func (tb *ToolBridge) handleSessionPermission(req SessionPermissionRequest) *SessionPermissionResponse {
+	allow := true
+	switch tb.permMode {
+	case "deny-all":
+		allow = false
+	case "approve-reads":
+		switch req.ToolCall.Kind {
+		case "read", "search", "think":
+		case "", "other":
+			allow = isReadOnlyTool(req.ToolCall.Title)
+		default:
+			allow = false
+		}
+	}
+	wanted := []string{"allow_once", "allow_always"}
+	if !allow {
+		wanted = []string{"reject_once", "reject_always"}
+	}
+	for _, kind := range wanted {
+		for _, o := range req.Options {
+			if o.Kind == kind {
+				return &SessionPermissionResponse{Outcome: SessionPermissionOutcome{Outcome: "selected", OptionID: o.OptionID}}
+			}
+		}
+	}
+	return &SessionPermissionResponse{Outcome: SessionPermissionOutcome{Outcome: "cancelled"}}
 }
 
 // resolvePath validates that a path stays within the workspace boundary.

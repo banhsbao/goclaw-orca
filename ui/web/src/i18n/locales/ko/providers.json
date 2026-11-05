@@ -115,7 +115,8 @@
     "perplexity": "Perplexity",
     "chatgpt_oauth": "ChatGPT 구독 (OAuth)",
     "yescale": "YesScale",
-    "acp": "ACP"
+    "acp": "ACP",
+    "antigravity_cli": "Antigravity CLI (Google 계정)"
   },
   "acp": {
     "description": "ACP 호환 코딩 에이전트를 서브프로세스로 조율합니다. API 키가 필요하지 않습니다.",
@@ -352,5 +353,24 @@
     "failedCreate": "공급자 생성 실패",
     "failedUpdate": "공급자 업데이트 실패",
     "failedDelete": "공급자 삭제 실패"
+  },
+  "antigravity": {
+    "description": "Google 계정으로 로그인하여 Antigravity CLI를 사용합니다. API 키가 필요 없습니다.",
+    "createAndSignIn": "생성 및 로그인",
+    "getLink": "로그인 링크 받기",
+    "openLink": "Google 로그인 열기",
+    "copyLink": "링크 복사",
+    "codeLabel": "인증 코드",
+    "codePlaceholder": "Google에서 받은 코드를 붙여넣으세요",
+    "connect": "연결",
+    "connected": "연결됨",
+    "notConnected": "연결되지 않음",
+    "relogin": "다시 로그인",
+    "preparing": "런타임 준비 중 (처음에는 약 1분 소요)...",
+    "model": "모델",
+    "modelSaved": "모델이 저장되었습니다",
+    "modelSaveFailed": "모델을 저장하지 못했습니다",
+    "loginFailed": "Antigravity 로그인 실패",
+    "codeTimeout": "로그인 완료 대기 시간이 초과되었습니다"
   }
 }

@@ -22,6 +22,7 @@ import { ProviderReasoningSection } from "./provider-reasoning-section";
 import { ProviderEmbeddingSection } from "./provider-embedding-section";
 import { ProviderPoolActivitySection } from "./provider-pool-activity-section";
 import { ProviderPricingSection } from "./provider-pricing-section";
+import { AntigravityLoginSection } from "../provider-antigravity-section";
 import {
   buildProviderSettingsWithChatGPTOAuthRouting,
   buildProviderSettingsWithReasoningDefaults,
@@ -239,6 +240,12 @@ export function ProviderOverview({ provider, onUpdate }: ProviderOverviewProps) 
           </div>
         </div>
       </section>
+
+      {provider.provider_type === "antigravity_cli" ? (
+        <section className="space-y-3 rounded-lg border p-3 sm:p-4">
+          <AntigravityLoginSection providerId={provider.id} settings={provider.settings} />
+        </section>
+      ) : null}
 
       {isOAuth ? <ProviderOAuthAccountSection provider={provider} managedByProvider={managedByProvider} managedMemberCount={managedMemberCount} availability={currentOAuthAvailability} quota={quotaByName.get(provider.name)} quotaLoading={quotasLoading || quotasFetching} /> : null}
 

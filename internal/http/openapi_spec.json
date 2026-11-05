@@ -7229,6 +7229,160 @@
         }
       }
     },
+    "/v1/providers/{id}/antigravity/login/start": {
+      "post": {
+        "tags": [
+          "Providers"
+        ],
+        "summary": "Start Antigravity CLI Google login for an antigravity_cli provider",
+        "description": "Returns status preparing while the runtime image builds (re-POST until it changes), pending with auth_url once the Google login URL is ready, or already_authenticated.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-GoClaw-User-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "External user ID for multi-tenant context."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "preparing | pending (auth_url) | already_authenticated"
+          },
+          "400": {
+            "description": "Invalid id or provider is not antigravity_cli"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Provider not found"
+          },
+          "502": {
+            "description": "Login failed"
+          },
+          "503": {
+            "description": "Antigravity runtime not configured"
+          }
+        }
+      }
+    },
+    "/v1/providers/{id}/antigravity/login/code": {
+      "post": {
+        "tags": [
+          "Providers"
+        ],
+        "summary": "Submit the Google authorization code for an antigravity_cli provider",
+        "description": "Returns status authenticated, or pending when not confirmed within 45s (poll auth-status).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-GoClaw-User-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "External user ID for multi-tenant context."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code"],
+                "properties": {
+                  "code": { "type": "string", "maxLength": 512 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "authenticated | pending"
+          },
+          "400": {
+            "description": "Invalid code, id or provider type"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Provider not found"
+          },
+          "409": {
+            "description": "No login in progress"
+          },
+          "502": {
+            "description": "Login failed"
+          }
+        }
+      }
+    },
+    "/v1/providers/{id}/antigravity/auth-status": {
+      "get": {
+        "tags": [
+          "Providers"
+        ],
+        "summary": "Antigravity CLI authentication status for an antigravity_cli provider",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-GoClaw-User-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "External user ID for multi-tenant context."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{\"authenticated\": bool}"
+          },
+          "400": {
+            "description": "Provider is not antigravity_cli"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "Provider not found"
+          }
+        }
+      }
+    },
     "/v1/embedding/status": {
       "get": {
         "tags": [
@@ -10660,7 +10814,7 @@
         "properties": {
           "name": { "type": "string", "description": "Unique provider slug" },
           "display_name": { "type": "string" },
-          "provider_type": { "type": "string", "enum": ["aimlapi", "api_route", "anthropic_native", "openai_compat", "gemini_native", "openrouter", "requesty", "groq", "deepseek", "mistral", "xai", "minimax_native", "cohere", "perplexity", "dashscope", "bailian", "chatgpt_oauth", "claude_cli", "yescale", "zai", "zai_coding", "ollama", "ollama_cloud", "acp"] },
+          "provider_type": { "type": "string", "enum": ["aimlapi", "api_route", "anthropic_native", "openai_compat", "gemini_native", "openrouter", "requesty", "groq", "deepseek", "mistral", "xai", "minimax_native", "cohere", "perplexity", "dashscope", "bailian", "chatgpt_oauth", "claude_cli", "yescale", "zai", "zai_coding", "ollama", "ollama_cloud", "acp", "antigravity_cli"] },
           "api_base": { "type": "string" },
           "api_key": { "type": "string" },
           "enabled": { "type": "boolean", "default": true },

@@ -67,6 +67,7 @@ type PendingRequest struct {
 	Req        agent.RunRequest
 	ResultCh   chan RunOutcome
 	EnqueuedAt time.Time // timestamp when enqueued, used for stale message detection
+	Ctx        context.Context
 }
 
 // RunOutcome is the result of a scheduled agent run.
@@ -96,11 +97,11 @@ type activeRunEntry struct {
 // SessionQueue manages agent runs for a single session key.
 // Supports configurable concurrency: 1 (serial) or N (concurrent).
 type SessionQueue struct {
-	key      string
-	config   QueueConfig
-	runFn    RunFunc
+	key     string
+	config  QueueConfig
+	runFn   RunFunc
 	laneMgr *LaneManager
-	lane     string
+	lane    string
 
 	mu              sync.Mutex
 	queue           []*PendingRequest
@@ -172,7 +173,7 @@ func (sq *SessionQueue) hasCapacity() bool {
 // Returns a channel that receives the result when the run completes.
 func (sq *SessionQueue) Enqueue(ctx context.Context, req agent.RunRequest) <-chan RunOutcome {
 	outcome := make(chan RunOutcome, 1)
-	pending := &PendingRequest{Req: req, ResultCh: outcome, EnqueuedAt: time.Now()}
+	pending := &PendingRequest{Req: req, ResultCh: outcome, EnqueuedAt: time.Now(), Ctx: ctx}
 
 	sq.mu.Lock()
 	defer sq.mu.Unlock()
@@ -275,6 +276,9 @@ func (sq *SessionQueue) startOne(ctx context.Context) {
 
 	pending := sq.queue[0]
 	sq.queue = sq.queue[1:]
+	if pending.Ctx != nil {
+		ctx = pending.Ctx
+	}
 
 	runID := pending.Req.RunID
 	runCtx, cancel := context.WithCancel(ctx)

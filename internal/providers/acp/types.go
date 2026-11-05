@@ -65,8 +65,9 @@ type MCPCaps struct {
 // --- Session Methods ---
 
 type NewSessionRequest struct {
-	Cwd        string   `json:"cwd"`
-	McpServers []string `json:"mcpServers"`
+	Cwd        string          `json:"cwd"`
+	McpServers []MCPServer     `json:"mcpServers"`
+	Meta       json.RawMessage `json:"_meta,omitempty"`
 }
 
 type NewSessionResponse struct {
@@ -74,9 +75,10 @@ type NewSessionResponse struct {
 }
 
 type LoadSessionRequest struct {
-	SessionID  string   `json:"sessionId"`
-	Cwd        string   `json:"cwd,omitempty"`
-	McpServers []string `json:"mcpServers"`
+	SessionID  string          `json:"sessionId"`
+	Cwd        string          `json:"cwd,omitempty"`
+	McpServers []MCPServer     `json:"mcpServers"`
+	Meta       json.RawMessage `json:"_meta,omitempty"`
 }
 
 type LoadSessionResponse struct {
@@ -110,14 +112,14 @@ type ContentBlock struct {
 type SessionUpdate struct {
 	SessionID  string `json:"sessionId"`
 	StopReason string `json:"stopReason,omitempty"`
-	
+
 	Kind     string          `json:"kind,omitempty"`
 	Message  *MessageUpdate  `json:"message,omitempty"`
 	ToolCall *ToolCallUpdate `json:"toolCall,omitempty"`
 
 	Update struct {
 		SessionUpdate string `json:"sessionUpdate"`
-		
+
 		Content json.RawMessage `json:"content,omitempty"`
 
 		Entries []struct {
@@ -227,6 +229,50 @@ type RequestPermissionRequest struct {
 	Description string `json:"description"`
 }
 
+type SessionPermissionOption struct {
+	OptionID string `json:"optionId"`
+	Name     string `json:"name"`
+	Kind     string `json:"kind"`
+}
+
+type SessionPermissionToolCall struct {
+	ToolCallID string `json:"toolCallId"`
+	Title      string `json:"title"`
+	Kind       string `json:"kind"`
+}
+
+type SessionPermissionRequest struct {
+	SessionID string                    `json:"sessionId"`
+	ToolCall  SessionPermissionToolCall `json:"toolCall"`
+	Options   []SessionPermissionOption `json:"options"`
+}
+
+type SessionPermissionOutcome struct {
+	Outcome  string `json:"outcome"`
+	OptionID string `json:"optionId,omitempty"`
+}
+
+type SessionPermissionResponse struct {
+	Outcome SessionPermissionOutcome `json:"outcome"`
+}
+
 type RequestPermissionResponse struct {
 	Outcome string `json:"outcome"` // "proceed_always", "approved", "denied"
+}
+
+type SetModelRequest struct {
+	SessionID string `json:"sessionId"`
+	ModelID   string `json:"modelId"`
+}
+
+type MCPServer struct {
+	Type    string       `json:"type"`
+	Name    string       `json:"name"`
+	URL     string       `json:"url"`
+	Headers []HTTPHeader `json:"headers"`
+}
+
+type HTTPHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
