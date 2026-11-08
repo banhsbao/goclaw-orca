@@ -4,6 +4,24 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ---
 
+## 2026-11-08
+
+### Orca servers tab
+
+**Features**
+
+- New tenant-scoped `orca_servers` registry (label, description, encrypted pairing code, health) with `/v1/orca-servers` CRUD plus `POST /v1/orca-servers/{id}/check`, restricted to tenant owner or admin.
+- Web UI: Orca Servers page in the sidebar with add/edit/delete, status badges and Check now.
+- Servers feed the `orca --server <label>` selection as the lowest-precedence source (user credential > agent credential > Orca server). Existing labeled credentials are not migrated; they keep working and win on label collision.
+- Background health check runs `orca status --json` every 5 minutes per server (20 second timeout) from the gateway network, not the sandbox. A gateway without the `orca` CLI reports `cli_missing`.
+
+**Changes**
+
+- Any agent granted the `orca` binary can use any server in its tenant.
+- Schema: PostgreSQL migration `000101` and SQLite schema 62 add `orca_servers`. Rolling back the PostgreSQL migration drops the table.
+
+---
+
 ## 2026-11-01
 
 ### Labeled Secure CLI credentials

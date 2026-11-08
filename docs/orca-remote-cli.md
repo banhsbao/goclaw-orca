@@ -57,9 +57,13 @@ covers the gateway process).
 
 ## 3. Credential
 
-1. Web UI → CLI Credentials → add from the `orca` preset.
-2. Store the pairing URL as the per-user `ORCA_PAIRING_CODE` credential.
+1. Web UI → CLI Credentials → add from the `orca` preset (registers the binary and its deny rules).
+2. Web UI → Orca Servers → add each machine: label, description, pairing URL (`orca://...`).
+   Tenant owner or admin only. Max 20 servers per tenant. The pairing code is encrypted at rest and never returned by the API.
 3. Grant the binary to the agents that should use it.
+
+Alternatively, store the pairing URL as a per-user or per-agent `ORCA_PAIRING_CODE` credential
+(see below). Both work side by side.
 
 The preset blocks commands that would retarget or leak the connection or touch the Orca
 machine's desktop: leading flags other than the gateway-handled `--server` selector (put the
@@ -67,7 +71,27 @@ subcommand first), `--pairing-code`,
 `--environment`, `serve`, `open`, `environment`, `account` (except `account list`), `computer`, `diagnostics`,
 `skills install|update|share`, and `orchestration reset`.
 
-### Multiple Orca machines
+### Orca Servers page
+
+Each entry is a tenant-wide machine with a status: `healthy`, `unhealthy` (runtime reachable but
+not `ready`), `error` (timeout, failed or unparseable `orca status`), `cli_missing` (no `orca` on the
+gateway `PATH`), or `unknown` (not checked yet). The label is fixed after creation; description and
+pairing code can be edited.
+
+A server is exposed to agents as one more `--server <label>` choice for the `orca` binary only.
+Any agent granted the `orca` binary can use any server in its tenant; there is no per-server
+allowlist. Use labeled credentials when a machine must be limited to one user or agent.
+
+Label precedence for the same label: user credential > agent credential > Orca server. A
+labeled credential therefore shadows a server with the same label, and the page status then does
+not reflect what that user or agent actually hits.
+
+**Migrating from labeled credentials (manual).** Existing labeled `orca` credentials keep working
+and are not copied automatically. To move a machine: add it on the Orca Servers page with the
+same label and pairing URL, confirm it is `healthy`, then delete the labeled credential from
+CLI Credentials so the server takes over.
+
+### Multiple Orca machines (labeled credentials)
 
 Use one credential per machine. In the CLI Credentials dialog (agent or user credential),
 set:
@@ -88,7 +112,7 @@ orca --server build-vm status --json
 
 | Situation | Result |
 |-----------|--------|
-| `--server <label>` | User credential with that label, else agent credential with that label |
+| `--server <label>` | User credential with that label, else agent credential, else Orca server |
 | `--server <unknown>` | Error; the label is echoed truncated |
 | No `--server`, default credential exists | Default credential, as before |
 | No `--server`, no default, one label | That label is used |
@@ -104,6 +128,13 @@ Ask the agent to run `orca status --json`. `runtime.state` should be `ready` and
 `target.environment` should be `pairing-code`. With several machines, run
 `orca --server <label> status --json` for each label. The bundled `orca-cli` skill covers the
 remaining commands.
+
+On the Orca Servers page, **Check now** runs `orca status --json` for one server and stores the
+result. The same check runs automatically for servers not checked in the last 5 minutes (first
+pass 30 seconds after gateway start), with a 20 second timeout per check. It runs from the
+gateway process network and `PATH`, not from the sandbox container, so a healthy status does not
+prove the sandbox can route to the machine. If the gateway image lacks the `orca` CLI the status is
+`cli_missing`; build the image with `ENABLE_ORCA_CLI=true`.
 
 ## 5. Getting files back
 

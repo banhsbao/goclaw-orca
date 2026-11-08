@@ -55,7 +55,7 @@ agent sandbox, against either the local Orca runtime or a paired remote one.
   `environment`, `account` (except `account list`), `computer`, `diagnostics`,
   `skills install|update|share`, and `orchestration reset` are blocked.
 - If `orca` is missing, or `status` reports a missing credential or an unreachable runtime,
-  tell the user what to set up (CLI in the image, `orca` credential, sandbox network access
+  tell the user what to set up (CLI in the image, `orca` credential or an entry on the Orca Servers page, sandbox network access
   to the Orca server) instead of retrying.
 - `orca` is not on the exec safe-bin list, so exec approval (`on-miss`) may ask the user
   to approve the first call.

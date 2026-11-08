@@ -32,6 +32,7 @@ import {
   Webhook,
   Cable,
   MonitorCog,
+  Server,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { SidebarGroup } from "./sidebar-group";
@@ -107,7 +108,10 @@ export function Sidebar({ collapsed, onNavItemClick }: SidebarProps) {
           )}
           <SidebarItem to={ROUTES.NODES} icon={Link} label={t("nav.nodes")} collapsed={collapsed} badge={pendingCount} />
           {isAdmin && (
-            <SidebarItem to={ROUTES.WORKSTATIONS} icon={MonitorCog} label={t("nav.workstations")} collapsed={collapsed} />
+            <>
+              <SidebarItem to={ROUTES.WORKSTATIONS} icon={MonitorCog} label={t("nav.workstations")} collapsed={collapsed} />
+              <SidebarItem to={ROUTES.ORCA_SERVERS} icon={Server} label={t("nav.orcaServers")} collapsed={collapsed} />
+            </>
           )}
         </SidebarGroup>
 

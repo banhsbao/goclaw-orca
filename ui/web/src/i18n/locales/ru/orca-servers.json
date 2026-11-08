@@ -1,0 +1,70 @@
+{
+  "title": "Серверы Orca",
+  "description": "Orca-рантаймы уровня tenant, к которым агенты обращаются через orca CLI (--server <label>).",
+  "addServer": "Добавить сервер",
+  "checkAll": "Проверить все",
+  "checkNow": "Проверить",
+  "cliMissingHint": "orca CLI не установлен на хосте шлюза. Установите его и проверьте снова.",
+  "never": "Никогда",
+  "note": "Серверы используются агентами с доступом к бинарю orca CLI. Метка CLI-учётных данных с тем же именем имеет приоритет.",
+  "columns": {
+    "label": "Метка",
+    "description": "Описание",
+    "status": "Статус",
+    "runtime": "Рантайм",
+    "lastChecked": "Проверен",
+    "lastHealthy": "Был здоров",
+    "lastError": "Последняя ошибка",
+    "actions": "Действия"
+  },
+  "status": {
+    "unknown": "Неизвестно",
+    "healthy": "Исправен",
+    "unhealthy": "Неисправен",
+    "error": "Ошибка",
+    "cli_missing": "Нет CLI"
+  },
+  "actions": {
+    "edit": "Изменить",
+    "delete": "Удалить"
+  },
+  "emptyTitle": "Нет серверов Orca",
+  "emptyDescription": "Запустите orca serve на машине, скопируйте Pairing URL (orca://...) и добавьте сюда с меткой.",
+  "form": {
+    "createTitle": "Добавить сервер Orca",
+    "createDesc": "Зарегистрируйте рантайм Orca по pairing URL.",
+    "editTitle": "Изменить {{label}}",
+    "editDesc": "Обновите описание или замените pairing-код.",
+    "label": "Метка",
+    "labelHint": "Строчные буквы, цифры, - и _ (до 32). Изменить позже нельзя.",
+    "description": "Описание",
+    "pairingCode": "Pairing-код",
+    "pairingPlaceholder": "orca://...",
+    "pairingKeep": "Оставьте пустым, чтобы сохранить текущий код",
+    "save": "Сохранить",
+    "create": "Создать",
+    "cancel": "Отмена"
+  },
+  "errors": {
+    "labelInvalid": "Метка должна соответствовать ^[a-z0-9][a-z0-9_-]{0,31}$",
+    "labelReserved": "Метка \"default\" зарезервирована",
+    "descriptionTooLong": "Описание не длиннее 200 символов",
+    "codeRequired": "Требуется pairing-код",
+    "codeInvalid": "Pairing-код должен начинаться с orca://"
+  },
+  "deleteDialog": {
+    "title": "Удалить сервер Orca",
+    "description": "Удалить \"{{label}}\"? Агенты больше не смогут его использовать.",
+    "confirmLabel": "Удалить"
+  },
+  "toast": {
+    "created": "Сервер добавлен",
+    "updated": "Сервер обновлён",
+    "deleted": "Сервер удалён",
+    "checked": "Проверка завершена",
+    "checkedAll": "Все серверы проверены",
+    "saveFailed": "Не удалось сохранить",
+    "deleteFailed": "Не удалось удалить",
+    "checkFailed": "Не удалось проверить"
+  }
+}

@@ -13,6 +13,7 @@ import (
 	httpapi "github.com/nextlevelbuilder/goclaw/internal/http"
 	mcpbridge "github.com/nextlevelbuilder/goclaw/internal/mcp"
 	"github.com/nextlevelbuilder/goclaw/internal/media"
+	"github.com/nextlevelbuilder/goclaw/internal/orcaserver"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/store/pg"
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
@@ -393,6 +394,10 @@ func (d *gatewayDeps) wireHTTPHandlersOnServer(
 			}
 			d.server.SetWorkstationsHandler(wsH)
 		}
+	}
+
+	if d.pgStores.OrcaServers != nil {
+		d.server.SetOrcaServersHandler(httpapi.NewOrcaServersHandler(d.pgStores.OrcaServers, d.pgStores.Tenants, orcaserver.NewChecker()))
 	}
 
 	// Seed + apply builtin tool disables

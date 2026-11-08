@@ -43,6 +43,7 @@ import (
 	mcpbridge "github.com/nextlevelbuilder/goclaw/internal/mcp"
 	mcpoauth "github.com/nextlevelbuilder/goclaw/internal/mcp/oauth"
 	"github.com/nextlevelbuilder/goclaw/internal/media"
+	"github.com/nextlevelbuilder/goclaw/internal/orcaserver"
 	"github.com/nextlevelbuilder/goclaw/internal/orchestration"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
 	"github.com/nextlevelbuilder/goclaw/internal/scheduler"
@@ -1012,6 +1013,9 @@ func runGateway() {
 		backfillTraceCostsAfterPricingSync(syncCtx, pgStores, snapshotWorker)
 	})
 	server.StartUpdateChecker(ctx)
+	if pgStores.OrcaServers != nil {
+		orcaserver.NewRefresher(pgStores.OrcaServers, orcaserver.NewChecker()).Start(ctx)
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

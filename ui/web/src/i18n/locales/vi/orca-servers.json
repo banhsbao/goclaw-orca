@@ -1,0 +1,70 @@
+{
+  "title": "Máy chủ Orca",
+  "description": "Các runtime Orca dùng chung toàn tenant, agent truy cập qua orca CLI (--server <label>).",
+  "addServer": "Thêm máy chủ",
+  "checkAll": "Kiểm tra tất cả",
+  "checkNow": "Kiểm tra ngay",
+  "cliMissingHint": "orca CLI chưa được cài trên máy chủ gateway. Hãy cài đặt rồi kiểm tra lại.",
+  "never": "Chưa bao giờ",
+  "note": "Máy chủ được dùng bởi các agent được cấp binary orca CLI. Credential CLI có nhãn trùng sẽ được ưu tiên.",
+  "columns": {
+    "label": "Nhãn",
+    "description": "Mô tả",
+    "status": "Trạng thái",
+    "runtime": "Runtime",
+    "lastChecked": "Kiểm tra gần nhất",
+    "lastHealthy": "Khỏe gần nhất",
+    "lastError": "Lỗi gần nhất",
+    "actions": "Thao tác"
+  },
+  "status": {
+    "unknown": "Chưa rõ",
+    "healthy": "Khỏe",
+    "unhealthy": "Không khỏe",
+    "error": "Lỗi",
+    "cli_missing": "Thiếu CLI"
+  },
+  "actions": {
+    "edit": "Sửa",
+    "delete": "Xóa"
+  },
+  "emptyTitle": "Chưa có máy chủ Orca",
+  "emptyDescription": "Chạy orca serve trên một máy, sao chép Pairing URL (orca://...), rồi thêm vào đây kèm một nhãn.",
+  "form": {
+    "createTitle": "Thêm máy chủ Orca",
+    "createDesc": "Đăng ký một runtime Orca bằng pairing URL.",
+    "editTitle": "Sửa {{label}}",
+    "editDesc": "Cập nhật mô tả hoặc thay mã pairing.",
+    "label": "Nhãn",
+    "labelHint": "Chữ thường, số, - và _ (tối đa 32). Không thể đổi sau này.",
+    "description": "Mô tả",
+    "pairingCode": "Mã pairing",
+    "pairingPlaceholder": "orca://...",
+    "pairingKeep": "Để trống để giữ mã hiện tại",
+    "save": "Lưu",
+    "create": "Tạo",
+    "cancel": "Hủy"
+  },
+  "errors": {
+    "labelInvalid": "Nhãn phải khớp ^[a-z0-9][a-z0-9_-]{0,31}$",
+    "labelReserved": "Nhãn \"default\" được dành riêng",
+    "descriptionTooLong": "Mô tả tối đa 200 ký tự",
+    "codeRequired": "Cần có mã pairing",
+    "codeInvalid": "Mã pairing phải bắt đầu bằng orca://"
+  },
+  "deleteDialog": {
+    "title": "Xóa máy chủ Orca",
+    "description": "Xóa \"{{label}}\"? Agent sẽ không dùng được nữa.",
+    "confirmLabel": "Xóa"
+  },
+  "toast": {
+    "created": "Đã thêm máy chủ",
+    "updated": "Đã cập nhật máy chủ",
+    "deleted": "Đã xóa máy chủ",
+    "checked": "Đã kiểm tra xong",
+    "checkedAll": "Đã kiểm tra tất cả",
+    "saveFailed": "Lưu thất bại",
+    "deleteFailed": "Xóa thất bại",
+    "checkFailed": "Kiểm tra thất bại"
+  }
+}

@@ -351,3 +351,30 @@ func TestExecServerSelectionBinaryLevelEnvCountsAsDefault(t *testing.T) {
 		t.Fatalf("expected no label queries, got %d", ls.listCalls)
 	}
 }
+
+func TestExecServerSelectionOrcaServerLabelWithoutDefaultOrCredentials(t *testing.T) {
+	serverOnly := []store.SecureCLICredentialLabel{{Label: "build-vm", Description: "CI", Source: "orca_server"}}
+	tool, ls, ctx := orcaScriptTool(t, serverOnly, false)
+	ls.resolved["build-vm"] = &store.SecureCLIResolvedCredential{Label: "build-vm", Source: "orca_server", SubjectID: "srv-1", Env: []byte(`{"ORCA_PAIRING_CODE":"server-code"}`)}
+
+	res := tool.Execute(ctx, map[string]any{"command": "orca status --json"})
+	if res.IsError || !strings.Contains(res.ForLLM, "CODE:SERVER-CODE") {
+		t.Fatalf("single server should be auto-picked: %s", res.ForLLM)
+	}
+	res = tool.Execute(ctx, map[string]any{"command": "orca --server build-vm status --json"})
+	if res.IsError || !strings.Contains(res.ForLLM, "ARGS:status --json") || !strings.Contains(res.ForLLM, "CODE:SERVER-CODE") {
+		t.Fatalf("explicit server selection failed: %s", res.ForLLM)
+	}
+}
+
+func TestExecServerSelectionDefaultCredentialBeatsOrcaServerWithoutSelector(t *testing.T) {
+	serverOnly := []store.SecureCLICredentialLabel{{Label: "build-vm", Source: "orca_server"}}
+	tool, ls, ctx := orcaScriptTool(t, serverOnly, true)
+	res := tool.Execute(ctx, map[string]any{"command": "orca status --json"})
+	if res.IsError || !strings.Contains(res.ForLLM, "CODE:DEFAULT-CODE") {
+		t.Fatalf("default credential must be kept: %s", res.ForLLM)
+	}
+	if ls.listCalls != 0 {
+		t.Fatalf("no label lookup expected, got %d", ls.listCalls)
+	}
+}

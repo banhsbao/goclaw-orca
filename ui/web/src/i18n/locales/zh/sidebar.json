@@ -44,6 +44,7 @@
     "packages": "软件包",
     "tenants": "租户",
     "backupRestore": "备份与恢复",
-    "workstations": "工作站"
+    "workstations": "工作站",
+    "orcaServers": "Orca 服务器"
   }
 }

@@ -1015,6 +1015,10 @@ func (s *Server) SetWorkstationsHandler(h *httpapi.WorkstationsHandler) {
 	s.handlers = append(s.handlers, h)
 }
 
+func (s *Server) SetOrcaServersHandler(h *httpapi.OrcaServersHandler) {
+	s.handlers = append(s.handlers, h)
+}
+
 // SetVersion sets the server version for health responses.
 func (s *Server) SetVersion(v string) { s.version = v }
 
