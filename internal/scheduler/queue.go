@@ -66,8 +66,8 @@ type TokenEstimateFunc func(sessionKey string) (tokens int, contextWindow int)
 type PendingRequest struct {
 	Req        agent.RunRequest
 	ResultCh   chan RunOutcome
-	EnqueuedAt time.Time // timestamp when enqueued, used for stale message detection
-	Ctx        context.Context
+	EnqueuedAt time.Time       // timestamp when enqueued, used for stale message detection
+	Ctx        context.Context // the Enqueue caller's context; the run derives from it, wherever it is started from
 }
 
 // RunOutcome is the result of a scheduled agent run.
@@ -97,11 +97,11 @@ type activeRunEntry struct {
 // SessionQueue manages agent runs for a single session key.
 // Supports configurable concurrency: 1 (serial) or N (concurrent).
 type SessionQueue struct {
-	key     string
-	config  QueueConfig
-	runFn   RunFunc
+	key      string
+	config   QueueConfig
+	runFn    RunFunc
 	laneMgr *LaneManager
-	lane    string
+	lane     string
 
 	mu              sync.Mutex
 	queue           []*PendingRequest
@@ -109,7 +109,6 @@ type SessionQueue struct {
 	activeOrder     []string                  // FIFO order of active runIDs
 	maxConcurrent   int                       // effective limit (from config or per-session override)
 	timer           *time.Timer               // debounce timer
-	parentCtx       context.Context           // stored from first Enqueue call
 	abortCutoffTime time.Time                 // messages enqueued before this are stale
 	generation      uint64                    // bumped on Reset() to ignore stale completions
 
@@ -178,11 +177,6 @@ func (sq *SessionQueue) Enqueue(ctx context.Context, req agent.RunRequest) <-cha
 	sq.mu.Lock()
 	defer sq.mu.Unlock()
 
-	// Store parent context for spawning future runs
-	if sq.parentCtx == nil {
-		sq.parentCtx = ctx
-	}
-
 	switch sq.config.Mode {
 	case QueueModeInterrupt:
 		// Cancel all active runs
@@ -195,7 +189,7 @@ func (sq *SessionQueue) Enqueue(ctx context.Context, req agent.RunRequest) <-cha
 		sq.drainQueue(RunOutcome{Err: context.Canceled})
 		sq.queue = append(sq.queue, pending)
 		if sq.hasCapacity() {
-			sq.scheduleNext(ctx)
+			sq.scheduleNext()
 		}
 
 	default: // queue, followup
@@ -206,7 +200,7 @@ func (sq *SessionQueue) Enqueue(ctx context.Context, req agent.RunRequest) <-cha
 		}
 
 		if sq.hasCapacity() {
-			sq.scheduleNext(ctx)
+			sq.scheduleNext()
 		}
 	}
 
@@ -215,14 +209,14 @@ func (sq *SessionQueue) Enqueue(ctx context.Context, req agent.RunRequest) <-cha
 
 // scheduleNext starts the next queued request(s), applying debounce.
 // Must be called with sq.mu held.
-func (sq *SessionQueue) scheduleNext(ctx context.Context) {
+func (sq *SessionQueue) scheduleNext() {
 	if len(sq.queue) == 0 {
 		return
 	}
 
 	debounce := time.Duration(sq.config.DebounceMs) * time.Millisecond
 	if debounce <= 0 {
-		sq.startAvailable(ctx)
+		sq.startAvailable()
 		return
 	}
 
@@ -234,23 +228,23 @@ func (sq *SessionQueue) scheduleNext(ctx context.Context) {
 		sq.mu.Lock()
 		defer sq.mu.Unlock()
 		if sq.hasCapacity() && len(sq.queue) > 0 {
-			sq.startAvailable(ctx)
+			sq.startAvailable()
 		}
 	})
 }
 
 // startAvailable starts as many queued requests as capacity allows.
 // Must be called with sq.mu held.
-func (sq *SessionQueue) startAvailable(ctx context.Context) {
+func (sq *SessionQueue) startAvailable() {
 	for sq.hasCapacity() && len(sq.queue) > 0 {
-		sq.startOne(ctx)
+		sq.startOne()
 	}
 }
 
 // startOne picks the first queued request and runs it in the lane.
 // Skips stale messages that were enqueued before the last abort cutoff.
 // Must be called with sq.mu held.
-func (sq *SessionQueue) startOne(ctx context.Context) {
+func (sq *SessionQueue) startOne() {
 	// Skip stale messages enqueued before the last /stopall abort cutoff.
 	for len(sq.queue) > 0 {
 		head := sq.queue[0]
@@ -276,12 +270,9 @@ func (sq *SessionQueue) startOne(ctx context.Context) {
 
 	pending := sq.queue[0]
 	sq.queue = sq.queue[1:]
-	if pending.Ctx != nil {
-		ctx = pending.Ctx
-	}
 
 	runID := pending.Req.RunID
-	runCtx, cancel := context.WithCancel(ctx)
+	runCtx, cancel := context.WithCancel(pending.Ctx)
 	sq.activeRuns[runID] = activeRunEntry{cancel: cancel, generation: sq.generation}
 	sq.activeOrder = append(sq.activeOrder, runID)
 
@@ -298,7 +289,7 @@ func (sq *SessionQueue) startOne(ctx context.Context) {
 		return
 	}
 
-	err := lane.Submit(ctx, func() {
+	err := lane.Submit(pending.Ctx, func() {
 		sq.executeRun(runCtx, runID, gen, pending)
 	})
 	if err != nil {
@@ -323,7 +314,7 @@ func (sq *SessionQueue) executeRun(ctx context.Context, runID string, runGenerat
 			delete(sq.activeRuns, runID)
 			sq.removeFromOrder(runID)
 			if sq.hasCapacity() && len(sq.queue) > 0 {
-				sq.scheduleNext(sq.parentCtx)
+				sq.scheduleNext()
 			}
 			sq.mu.Unlock()
 		}
@@ -345,8 +336,7 @@ func (sq *SessionQueue) executeRun(ctx context.Context, runID string, runGenerat
 	}
 
 	if sq.hasCapacity() && len(sq.queue) > 0 {
-		// Use parentCtx (not the per-run ctx which may be cancelled)
-		sq.scheduleNext(sq.parentCtx)
+		sq.scheduleNext()
 	}
 	sq.mu.Unlock()
 }
