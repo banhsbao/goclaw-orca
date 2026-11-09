@@ -1,0 +1,70 @@
+{
+  "title": "Orca servers",
+  "description": "Tenant-wide Orca runtimes that agents reach with the orca CLI (--server <label>).",
+  "addServer": "Add server",
+  "checkAll": "Check all",
+  "checkNow": "Check now",
+  "cliMissingHint": "The orca CLI is not installed on the gateway host. Install it, then check again.",
+  "never": "Never",
+  "note": "Servers are used by agents granted the orca CLI credential binary. A labeled CLI credential with the same label takes precedence.",
+  "columns": {
+    "label": "Label",
+    "description": "Description",
+    "status": "Status",
+    "runtime": "Runtime",
+    "lastChecked": "Last checked",
+    "lastHealthy": "Last healthy",
+    "lastError": "Last error",
+    "actions": "Actions"
+  },
+  "status": {
+    "unknown": "Unknown",
+    "healthy": "Healthy",
+    "unhealthy": "Unhealthy",
+    "error": "Error",
+    "cli_missing": "CLI missing"
+  },
+  "actions": {
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "emptyTitle": "No Orca servers",
+  "emptyDescription": "Run orca serve on a machine, copy the Pairing URL (orca://...), then add it here with a label.",
+  "form": {
+    "createTitle": "Add Orca server",
+    "createDesc": "Register an Orca runtime by its pairing URL.",
+    "editTitle": "Edit {{label}}",
+    "editDesc": "Update the description or replace the pairing code.",
+    "label": "Label",
+    "labelHint": "Lowercase letters, digits, - and _ (max 32). Cannot be changed later.",
+    "description": "Description",
+    "pairingCode": "Pairing code",
+    "pairingPlaceholder": "orca://...",
+    "pairingKeep": "Leave empty to keep the current code",
+    "save": "Save",
+    "create": "Create",
+    "cancel": "Cancel"
+  },
+  "errors": {
+    "labelInvalid": "Label must match ^[a-z0-9][a-z0-9_-]{0,31}$",
+    "labelReserved": "The label \"default\" is reserved",
+    "descriptionTooLong": "Description must be 200 characters or fewer",
+    "codeRequired": "Pairing code is required",
+    "codeInvalid": "Pairing code must start with orca://"
+  },
+  "deleteDialog": {
+    "title": "Delete Orca server",
+    "description": "Delete \"{{label}}\"? Agents will no longer be able to use it.",
+    "confirmLabel": "Delete"
+  },
+  "toast": {
+    "created": "Server added",
+    "updated": "Server updated",
+    "deleted": "Server deleted",
+    "checked": "Check finished",
+    "checkedAll": "All servers checked",
+    "saveFailed": "Save failed",
+    "deleteFailed": "Delete failed",
+    "checkFailed": "Check failed"
+  }
+}

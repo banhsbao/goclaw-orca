@@ -517,6 +517,18 @@ stores one encrypted PAT/SSH/env payload per `(binary_id, agent_id, tenant_id)`.
 | `SetAgentCredentialsTyped(binaryID, agentID, env, type, hostScope)` | Store agent-scoped PAT/SSH/env payload |
 | `DeleteAgentCredentials(binaryID, agentID)` | Remove an agent-scoped credential |
 
+Labeled credentials (`label`, `description`) are listed through `ListCredentialLabels` with
+`Source` `user`, `agent`, or `orca_server`. For binary `orca`, tenant `orca_servers` rows are the
+lowest-precedence source (user > agent > orca_server) in both PostgreSQL and SQLite.
+
+### OrcaServerStore
+
+Tenant-scoped Orca machine registry (`internal/store/orca_server_store.go`; PG
+`internal/store/pg/orca_servers.go`, SQLite `internal/store/sqlitestore/orca_servers.go`).
+`List`, `Get`, `GetWithSecret`, `Create`, `Update`, `Delete`, `UpdateHealth`, `ListDueForCheck`.
+Every method filters by the tenant in context except `UpdateHealth` and `ListDueForCheck`, which the background
+refresher uses across tenants. Max 20 rows per tenant.
+
 ### APIKeyStore
 
 Gateway API key management. Keys are SHA-256 hashed at rest; validation compares hash to incoming key. Supports scopes, expiration, and revocation.
@@ -616,6 +628,7 @@ flowchart TD
 | `cron_jobs` | Scheduled tasks | `schedule_kind` (at/every/cron), `payload` (JSONB) |
 | `mcp_servers` | MCP server configs | `transport`, `api_key` (encrypted), `tool_prefix` |
 | `custom_tools` | Dynamic tool definitions | `command` (template), `agent_id` (NULL = global), `env` (encrypted) |
+| `orca_servers` | Orca machine registry (migration `000101`, SQLite schema 62) | UNIQUE(tenant_id, label), `pairing_code` (AES-256-GCM encrypted), `last_status`, `last_runtime_state`, `last_error`, `last_checked_at`, `last_healthy_at` |
 
 ### Migrations
 

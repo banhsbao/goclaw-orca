@@ -251,6 +251,87 @@
         }
       }
     },
+    "/v1/orca-servers": {
+      "get": {
+        "tags": ["Orca Servers"],
+        "summary": "List Orca servers",
+        "description": "Tenant-scoped Orca server registry. Requires tenant admin. The pairing code is never returned.",
+        "responses": {
+          "200": {
+            "description": "Orca servers",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/OrcaServer" } } } } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Orca Servers"],
+        "summary": "Create an Orca server",
+        "description": "Label is lowercased and immutable; `default` is reserved. Max 20 per tenant. Call the check endpoint afterwards to populate health.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["label", "pairing_code"], "properties": {
+            "label": { "type": "string", "example": "prod" },
+            "description": { "type": "string", "maxLength": 200 },
+            "pairing_code": { "type": "string", "example": "orca://pair?..." }
+          } } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrcaServer" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/v1/orca-servers/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+      "get": {
+        "tags": ["Orca Servers"],
+        "summary": "Get an Orca server",
+        "responses": {
+          "200": { "description": "Orca server", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrcaServer" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Orca Servers"],
+        "summary": "Update an Orca server",
+        "description": "Omitted or empty `pairing_code` keeps the stored code. Label cannot change.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": {
+            "description": { "type": "string", "maxLength": 200 },
+            "pairing_code": { "type": "string" }
+          } } } }
+        },
+        "responses": {
+          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrcaServer" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Orca Servers"],
+        "summary": "Delete an Orca server",
+        "responses": {
+          "204": { "description": "Deleted" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/v1/orca-servers/{id}/check": {
+      "post": {
+        "tags": ["Orca Servers"],
+        "summary": "Run a health check now",
+        "description": "Runs `orca status --json` synchronously (20s timeout) and persists the result. A missing CLI or failing server is reported in `last_status`, not as an HTTP error.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Server with refreshed health", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OrcaServer" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/v1/api-keys": {
       "get": {
         "tags": ["API Keys"],
@@ -10850,6 +10931,24 @@
               }
             }
           }
+        }
+      },
+      "OrcaServer": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "tenant_id": { "type": "string", "format": "uuid" },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "has_pairing_code": { "type": "boolean" },
+          "last_status": { "type": "string", "enum": ["unknown", "healthy", "unhealthy", "error", "cli_missing"] },
+          "last_runtime_state": { "type": "string" },
+          "last_error": { "type": "string" },
+          "last_checked_at": { "type": "string", "format": "date-time", "nullable": true },
+          "last_healthy_at": { "type": "string", "format": "date-time", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "created_by": { "type": "string" }
         }
       },
       "Error": {

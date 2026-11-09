@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -15,6 +16,8 @@ const (
 	SecureCLICredentialLabelMaxLen       = 32
 	SecureCLICredentialDescriptionMaxLen = 200
 	SecureCLIDefaultLabelAlias           = "default"
+	SecureCLISourceOrcaServer            = "orca_server"
+	OrcaPairingCodeEnvVar                = "ORCA_PAIRING_CODE"
 )
 
 var secureCLICredentialLabelPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
@@ -106,6 +109,21 @@ func SanitizeSecureCLICredentialDescription(s string) string {
 	return out
 }
 
+func secureCLILabelSourceRank(source string) int {
+	switch source {
+	case "user":
+		return 0
+	case "agent":
+		return 1
+	default:
+		return 2
+	}
+}
+
+func OrcaServerCredentialEnv(pairingCode string) ([]byte, error) {
+	return json.Marshal(map[string]string{OrcaPairingCodeEnvVar: pairingCode})
+}
+
 func MergeSecureCLICredentialLabels(rows []SecureCLICredentialLabel) []SecureCLICredentialLabel {
 	type key struct {
 		binary uuid.UUID
@@ -121,7 +139,7 @@ func MergeSecureCLICredentialLabels(rows []SecureCLICredentialLabel) []SecureCLI
 			out = append(out, r)
 			continue
 		}
-		if out[i].Source != "user" && r.Source == "user" {
+		if secureCLILabelSourceRank(r.Source) < secureCLILabelSourceRank(out[i].Source) {
 			out[i] = r
 		}
 	}

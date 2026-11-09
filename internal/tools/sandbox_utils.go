@@ -164,6 +164,14 @@ func sandboxCwdForHostPath(hostCwd, mountWorkspace, containerBase string) (strin
 	return path.Join(filepath.ToSlash(containerBase), filepath.ToSlash(rel)), nil
 }
 
+func sandboxPathToHost(containerPath, mountWorkspace, containerBase string) string {
+	rel, err := filepath.Rel(filepath.Clean(containerBase), filepath.Clean(containerPath))
+	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
+		rel = "."
+	}
+	return filepath.Join(mountWorkspace, rel)
+}
+
 func MapHostPathToSandbox(filePath, mountWorkspace, containerBase string) string {
 	if !strings.HasPrefix(filePath, "/") || mountWorkspace == "" {
 		return filePath

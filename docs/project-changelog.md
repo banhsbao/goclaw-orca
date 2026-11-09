@@ -30,6 +30,24 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ---
 
+## 2026-11-08
+
+### Orca servers tab
+
+**Features**
+
+- New tenant-scoped `orca_servers` registry (label, description, encrypted pairing code, health) with `/v1/orca-servers` CRUD plus `POST /v1/orca-servers/{id}/check`, restricted to tenant owner or admin.
+- Web UI: Orca Servers page in the sidebar with add/edit/delete, status badges and Check now.
+- Servers feed the `orca --server <label>` selection as the lowest-precedence source (user credential > agent credential > Orca server). Existing labeled credentials are not migrated; they keep working and win on label collision.
+- Background health check runs `orca status --json` every 5 minutes per server (20 second timeout) from the gateway network, not the sandbox. A gateway without the `orca` CLI reports `cli_missing`.
+
+**Changes**
+
+- Any agent granted the `orca` binary can use any server in its tenant.
+- Schema: PostgreSQL migration `000101` and SQLite schema 62 add `orca_servers`. Rolling back the PostgreSQL migration drops the table.
+
+---
+
 ## 2026-11-01
 
 ### Labeled Secure CLI credentials
@@ -92,6 +110,22 @@ Significant changes, features, and fixes in reverse chronological order.
 - Added the `ENABLE_ORCA_CLI` build arg to `Dockerfile` and `Dockerfile.sandbox`
   (pinned, checksum-verified CLI bundle) and the `docker-compose.orca.yml` overlay.
 - Updated the bundled `orca-cli` skill for remote mode. See `docs/orca-remote-cli.md`.
+
+---
+
+## 2026-11-04
+
+### ChatGPT Subscription (OAuth) model catalog refresh
+
+**Fixes**
+
+- Replaced retired and deprecated models in the ChatGPT OAuth catalog with the
+  current GPT-6 and GPT-5.6 models, and changed the default to `gpt-6.1-sol`
+  because OpenAI retired `gpt-5.5` for ChatGPT sign-in on 2026-10-14.
+- Added reasoning metadata for the new models. `max` and `ultra` are not
+  selectable yet.
+- Added GPT-6 to token counting and to the OpenAI forward-compat model specs,
+  so these models no longer fall back to the character heuristic.
 
 ---
 

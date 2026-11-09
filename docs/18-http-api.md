@@ -181,7 +181,7 @@ can override or inherit routing behavior while keeping the main `provider` field
 ```json
 {
   "provider": "openai-codex",
-  "model": "gpt-5.5",
+  "model": "gpt-6.1-sol",
   "chatgpt_oauth_routing": {
     "override_mode": "custom",
     "strategy": "round_robin"
@@ -247,7 +247,7 @@ Agents can now store capability-aware GPT-5/Codex reasoning intent under top-lev
 ```json
 {
   "provider": "openai-codex",
-  "model": "gpt-5.5",
+  "model": "gpt-6.1-sol",
   "reasoning_config": {
     "override_mode": "inherit"
   }
@@ -508,11 +508,11 @@ Example response:
 {
   "models": [
     {
-      "id": "gpt-5.5",
-      "name": "GPT-5.5",
+      "id": "gpt-6.1-sol",
+      "name": "GPT-6.1-Sol",
       "reasoning": {
-        "levels": ["none", "low", "medium", "high", "xhigh"],
-        "default_effort": "medium"
+        "levels": ["low", "medium", "high", "xhigh"],
+        "default_effort": "low"
       }
     },
     {
@@ -1392,7 +1392,7 @@ execution. See the [Orca remote CLI guide](./orca-remote-cli.md) for the operato
 | No `--server`, no default, one label | That label |
 | No `--server`, no default, two or more labels | Error listing labels and descriptions |
 | No `--server`, no default, no labels | Legacy behavior (base/grant env only) |
-| `--server <label>` | User row with that label, else agent row with that label |
+| `--server <label>` | User row with that label, else agent row, else Orca server (binary `orca` only) |
 | `--server default`, no default row | Unknown-server error |
 | `--server <unknown>` | Unknown-server error (label echoed, truncated) |
 
@@ -1416,6 +1416,32 @@ execution. See the [Orca remote CLI guide](./orca-remote-cli.md) for the operato
 | `DELETE` | `/v1/cli-credentials/{id}/agent-grants/{grantId}` | Delete agent grant |
 
 ---
+
+### Orca Servers
+
+Tenant-scoped registry of Orca machines, offered as `--server <label>` choices for the `orca`
+binary at the lowest precedence. Tenant owner or admin only. See the
+[Orca remote CLI guide](./orca-remote-cli.md).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/v1/orca-servers` | List servers (`{"items": [...]}`) |
+| `POST` | `/v1/orca-servers` | Create (`label`, `description`, `pairing_code`) |
+| `GET` | `/v1/orca-servers/{id}` | Get one |
+| `PUT` | `/v1/orca-servers/{id}` | Update `description` and/or `pairing_code` |
+| `DELETE` | `/v1/orca-servers/{id}` | Delete (`204`) |
+| `POST` | `/v1/orca-servers/{id}/check` | Run `orca status --json` now and return the updated row |
+
+Responses carry `id`, `label`, `description`, `has_pairing_code`, `last_status`
+(`unknown|healthy|unhealthy|error|cli_missing`), `last_runtime_state`, `last_error`,
+`last_checked_at`, `last_healthy_at`, `created_at`, `updated_at`, `created_by`. The pairing code is
+never returned.
+
+| Status | When |
+|--------|------|
+| `400` | Label fails the pattern; pairing code not `orca://...`, has whitespace or exceeds 2048 characters; 21st server |
+| `404` | Unknown id or id in another tenant |
+| `409` | Label already exists in the tenant |
 
 ## 21. Runtime & Packages Management
 

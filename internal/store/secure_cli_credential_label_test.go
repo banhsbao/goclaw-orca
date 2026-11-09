@@ -152,3 +152,27 @@ func TestApplyLabeledCredential_NilSafe(t *testing.T) {
 	b.ApplyLabeledCredential(&SecureCLIResolvedCredential{})
 	(&SecureCLIBinary{}).ApplyLabeledCredential(nil)
 }
+
+func TestMergeSecureCLICredentialLabels_RanksUserAgentThenOrcaServer(t *testing.T) {
+	b := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	rows := []SecureCLICredentialLabel{
+		{BinaryID: b, Label: "a", Source: SecureCLISourceOrcaServer},
+		{BinaryID: b, Label: "a", Source: "agent"},
+		{BinaryID: b, Label: "b", Source: "agent"},
+		{BinaryID: b, Label: "b", Source: SecureCLISourceOrcaServer},
+		{BinaryID: b, Label: "c", Source: SecureCLISourceOrcaServer},
+		{BinaryID: b, Label: "c", Source: "agent"},
+		{BinaryID: b, Label: "c", Source: "user"},
+		{BinaryID: b, Label: "d", Source: SecureCLISourceOrcaServer},
+	}
+	want := map[string]string{"a": "agent", "b": "agent", "c": "user", "d": "orca_server"}
+	got := MergeSecureCLICredentialLabels(rows)
+	if len(got) != len(want) {
+		t.Fatalf("expected %d rows, got %+v", len(want), got)
+	}
+	for _, g := range got {
+		if want[g.Label] != g.Source {
+			t.Errorf("label %s: got source %s want %s", g.Label, g.Source, want[g.Label])
+		}
+	}
+}

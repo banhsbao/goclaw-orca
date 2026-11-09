@@ -280,11 +280,7 @@ func (t *WriteFileTool) executeInSandbox(ctx context.Context, path, content, san
 	result.Deliverable = content
 	if deliver {
 		// Sandbox workspace is bind-mounted — resolve to host path for delivery
-		workspace := ToolWorkspaceFromCtx(ctx)
-		if workspace == "" {
-			workspace = t.workspace
-		}
-		hostPath := filepath.Join(workspace, path)
+		hostPath := sandboxPathToHost(containerPath, mountWorkspace, containerCwd)
 		result.Media = []bus.MediaFile{{Path: hostPath, Filename: filepath.Base(hostPath)}}
 		if dm := DeliveredMediaFromCtx(ctx); dm != nil {
 			dm.Mark(hostPath)

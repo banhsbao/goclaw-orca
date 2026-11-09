@@ -43,6 +43,7 @@ import (
 	mcpbridge "github.com/nextlevelbuilder/goclaw/internal/mcp"
 	mcpoauth "github.com/nextlevelbuilder/goclaw/internal/mcp/oauth"
 	"github.com/nextlevelbuilder/goclaw/internal/media"
+	"github.com/nextlevelbuilder/goclaw/internal/orcaserver"
 	"github.com/nextlevelbuilder/goclaw/internal/orchestration"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
 	"github.com/nextlevelbuilder/goclaw/internal/scheduler"
@@ -288,7 +289,11 @@ func runGateway() {
 	}
 
 	slog.Debug("creating mcpMgr via setupToolRegistry")
-	toolsReg, execApprovalMgr, mcpMgr, sandboxMgr, browserMgr, webFetchTool, ttsTool, audioMgr, permPE, toolPE, dataDir, agentCfg := setupToolRegistry(cfg, workspace, providerRegistry)
+	toolsReg, execApprovalMgr, mcpMgr, sandboxMgr, browserMgr, webFetchTool, ttsTool, audioMgr, permPE, toolPE, dataDir, agentCfg, err := setupToolRegistry(cfg, workspace, providerRegistry)
+	if err != nil {
+		slog.Warn("security.sandbox_unavailable", "configured_mode", cfg.Agents.Defaults.Sandbox.Mode, "error", err)
+		os.Exit(1)
+	}
 	slog.Debug("setupToolRegistry completed", "mcpMgr_nil", mcpMgr == nil)
 	if browserMgr != nil {
 		defer browserMgr.Close()
@@ -1012,6 +1017,9 @@ func runGateway() {
 		backfillTraceCostsAfterPricingSync(syncCtx, pgStores, snapshotWorker)
 	})
 	server.StartUpdateChecker(ctx)
+	if pgStores.OrcaServers != nil {
+		orcaserver.NewRefresher(pgStores.OrcaServers, orcaserver.NewChecker()).Start(ctx)
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

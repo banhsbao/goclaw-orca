@@ -29,6 +29,7 @@ func makeDelegateAnnounceCallback(
 	return func(sessionKey string, items []tools.AnnounceQueueItem, meta tools.AnnounceMetadata) {
 		roster := subagentMgr.RosterForParent(tools.TaskScope{
 			TenantID: meta.OriginTenantID, RootAgentID: meta.RootAgentID, RootAgentKey: meta.ParentAgent,
+			Administrative: true,
 		})
 		content := tools.FormatBatchedAnnounce(items, roster)
 		senderID := fmt.Sprintf("subagent:batch-%d", len(items))
@@ -111,6 +112,7 @@ func makeDelegateAnnounceCallback(
 
 // subagentAnnounceEntry holds one subagent completion result waiting to be announced.
 type subagentAnnounceEntry struct {
+	DelegationID string
 	Label        string
 	Status       string // "completed", "failed", "cancelled"
 	Content      string
@@ -186,6 +188,7 @@ func processSubagentAnnounceLoop(
 		// Refresh roster each iteration for up-to-date task statuses.
 		roster = subagentMgr.RosterForParent(tools.TaskScope{
 			TenantID: r.TenantID, RootAgentID: r.RootAgentID, RootAgentKey: r.ParentAgent,
+			Administrative: true,
 		})
 		content := buildMergedSubagentAnnounce(entries, roster)
 
@@ -222,8 +225,34 @@ func processSubagentAnnounceLoop(
 			ParentRootSpanID: r.ParentRootSpanID,
 		}
 
-		outCh := sched.Schedule(ctx, scheduler.LaneSubagent, req)
+		var delegationIDs []string
+		for _, e := range entries {
+			if e.DelegationID != "" {
+				delegationIDs = append(delegationIDs, e.DelegationID)
+			}
+		}
+		pendingTask := claimPendingTeamTask(delegationIDs)
+		runCtx := ctx
+		var taskFlags *tools.TaskActionFlags
+		unregisterFlags := func() {}
+		if pendingTask != nil {
+			taskFlags = &tools.TaskActionFlags{}
+			runCtx = tools.WithTaskActionFlags(ctx, taskFlags)
+			unregisterFlags = tools.RegisterSessionTaskActionFlags(r.SessionKey, taskFlags)
+			req.TeamTaskID = pendingTask.TeamTaskID
+			req.TeamID = pendingTask.TeamID
+		}
+
+		outCh := sched.Schedule(runCtx, scheduler.LaneSubagent, req)
 		outcome := <-outCh
+		unregisterFlags()
+
+		if pendingTask != nil {
+			pendingTask.resolveAfterAnnounce(ctx, outcome, taskFlags)
+			slog.Info("subagent announce: batch processed for pending team task",
+				"batch_size", len(entries), "session", r.SessionKey, "task_id", pendingTask.TeamTaskID)
+			continue
+		}
 
 		if outcome.Err != nil {
 			if !errors.Is(outcome.Err, context.Canceled) {

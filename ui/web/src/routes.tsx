@@ -117,6 +117,9 @@ const HooksPage = lazyWithRetry(() =>
 const WebhooksPage = lazyWithRetry(() =>
   import("@/pages/webhooks/webhooks-page").then((m) => ({ default: m.WebhooksPage })),
 );
+const OrcaServersPage = lazyWithRetry(() =>
+  import("@/pages/orca-servers/orca-servers-page").then((m) => ({ default: m.OrcaServersPage })),
+);
 const WorkstationsPage = lazyWithRetry(() =>
   import("@/pages/workstations/workstations-page").then((m) => ({ default: m.WorkstationsPage })),
 );
@@ -191,6 +194,7 @@ export function AppRoutes() {
           <Route path={ROUTES.WEBHOOKS} element={<RequireAdmin><WebhooksPage /></RequireAdmin>} />
           <Route path={ROUTES.NODES} element={<RequireAdmin><NodesPage /></RequireAdmin>} />
           <Route path={ROUTES.WORKSTATIONS} element={<RequireAdmin><WorkstationsPage /></RequireAdmin>} />
+          <Route path={ROUTES.ORCA_SERVERS} element={<RequireAdmin><OrcaServersPage /></RequireAdmin>} />
           <Route path={ROUTES.LOGS} element={<RequireAdmin><LogsPage /></RequireAdmin>} />
           <Route path={ROUTES.BUILTIN_TOOLS} element={<RequireAdmin><BuiltinToolsPage /></RequireAdmin>} />
           <Route path={ROUTES.MCP} element={<RequireAdmin><MCPPage /></RequireAdmin>} />

@@ -60,6 +60,8 @@ type Stores struct {
 	WorkstationPermissions WorkstationPermissionStore
 	WorkstationActivity    WorkstationActivityStore
 
+	OrcaServers OrcaServerStore
+
 	// UsageCaps is Standard/PostgreSQL only in the first budget-control rollout.
 	UsageCaps UsageCapStore
 }

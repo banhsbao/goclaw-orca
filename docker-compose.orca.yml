@@ -6,7 +6,8 @@
 #   1. On the Orca machine: orca serve --port 6768 --pairing-address <tailscale-or-lan-ip>
 #   2. Build the sandbox image with the CLI:
 #      docker build --build-arg ENABLE_ORCA_CLI=true -t goclaw-sandbox:bookworm-slim -f Dockerfile.sandbox .
-#   3. Register the `orca` Secure CLI preset and store ORCA_PAIRING_CODE as a per-user credential.
+#   3. Register the `orca` Secure CLI preset, then add each machine on the Orca Servers page
+#      (or store ORCA_PAIRING_CODE as a per-user credential).
 #
 # Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.postgres.yml -f docker-compose.sandbox.yml -f docker-compose.orca.yml up -d --build

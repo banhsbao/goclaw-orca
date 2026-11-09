@@ -49,5 +49,6 @@ export const ROUTES = {
   HOOK_DETAIL: "/hooks/:id",
   WEBHOOKS: "/webhooks",
   WORKSTATIONS: "/workstations",
+  ORCA_SERVERS: "/orca-servers",
   WORKSTATION_DETAIL: "/workstations/:id",
 } as const;

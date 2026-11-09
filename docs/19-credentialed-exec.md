@@ -140,6 +140,20 @@ type SecureCLIStore interface {
 2. Global config (`agent_id IS NULL`)
 3. `nil` if no match
 
+### Label Sources (`--server <label>`)
+
+`ListCredentialLabels` / `ResolveLabeledCredential` merge up to three sources per label, highest
+precedence first:
+
+| Source | Scope |
+|--------|-------|
+| `user` | Labeled per-user credential |
+| `agent` | Labeled per-agent credential |
+| `orca_server` | Tenant `orca_servers` row; binary `orca` only; injects `ORCA_PAIRING_CODE` |
+
+A label present in several sources resolves to the highest one. See the
+[Orca remote CLI guide](./orca-remote-cli.md).
+
 ---
 
 ## 5. Direct Exec Engine

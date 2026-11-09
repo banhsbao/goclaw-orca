@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -46,11 +47,8 @@ func (s *SQLiteSecureCLIStore) ListCredentialLabels(ctx context.Context, q store
 		build("secure_cli_agent_credentials", "agent_id", "agent", *q.AgentID)
 	}
 
-	query := branches[0]
-	if len(branches) == 2 {
-		query += ` UNION ALL ` + branches[1]
-	}
-	query += ` ORDER BY 1, 2`
+	branches = append(branches, orcaServerLabelBranch(q, isCross, tid, &args))
+	query := strings.Join(branches, ` UNION ALL `) + ` ORDER BY 1, 2`
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -102,9 +100,12 @@ func (s *SQLiteSecureCLIStore) ResolveLabeledCredential(ctx context.Context, bin
 			query += ` AND tenant_id = ?`
 			args = append(args, tid)
 		}
-		return s.scanResolved(ctx, query+` LIMIT 1`, args, label, "agent", "")
+		res, err := s.scanResolved(ctx, query+` LIMIT 1`, args, label, "agent", "")
+		if err != nil || res != nil {
+			return res, err
+		}
 	}
-	return nil, nil
+	return s.resolveOrcaServerCredential(ctx, binaryID, label, isCross, tid)
 }
 
 func (s *SQLiteSecureCLIStore) scanResolved(ctx context.Context, query string, args []any, label, source, subjectID string) (*store.SecureCLIResolvedCredential, error) {

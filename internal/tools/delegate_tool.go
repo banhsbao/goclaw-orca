@@ -601,6 +601,11 @@ func (t *DelegateTool) executeAsyncMode(ctx context.Context, job *delegateArtifa
 		}
 	}()
 	completionTransferred = true
+	if req.ChatID != "" && t.msgBus != nil {
+		if flags := TaskActionFlagsFromCtx(ctx); flags != nil {
+			flags.AddAsyncDelegation(req.DelegationID)
+		}
+	}
 
 	result, _ := json.Marshal(map[string]any{
 		"delegation_id": req.DelegationID,

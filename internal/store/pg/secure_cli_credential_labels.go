@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -51,11 +52,8 @@ func (s *PGSecureCLIStore) ListCredentialLabels(ctx context.Context, q store.Sec
 		branches = append(branches, `SELECT binary_id, label::text AS label, description::text AS description, 'agent'::text AS source FROM secure_cli_agent_credentials WHERE `+where)
 	}
 
-	query := branches[0]
-	if len(branches) == 2 {
-		query += ` UNION ALL ` + branches[1]
-	}
-	query += ` ORDER BY 1, 2`
+	branches = append(branches, orcaServerLabelBranch(q, isCross, tid, next))
+	query := strings.Join(branches, ` UNION ALL `) + ` ORDER BY 1, 2`
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -107,9 +105,12 @@ func (s *PGSecureCLIStore) ResolveLabeledCredential(ctx context.Context, binaryI
 			query += ` AND tenant_id = $4`
 			args = append(args, tid)
 		}
-		return s.scanResolved(ctx, query+` LIMIT 1`, args, label, "agent", "")
+		res, err := s.scanResolved(ctx, query+` LIMIT 1`, args, label, "agent", "")
+		if err != nil || res != nil {
+			return res, err
+		}
 	}
-	return nil, nil
+	return s.resolveOrcaServerCredential(ctx, binaryID, label, isCross, tid)
 }
 
 func (s *PGSecureCLIStore) scanResolved(ctx context.Context, query string, args []any, label, source, subjectID string) (*store.SecureCLIResolvedCredential, error) {

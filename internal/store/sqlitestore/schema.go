@@ -16,7 +16,7 @@ var schemaSQL string
 
 // SchemaVersion is the current SQLite schema version.
 // Bump this when adding new migration steps below.
-const SchemaVersion = 61
+const SchemaVersion = 62
 
 // migrations maps version → SQL to apply when upgrading FROM that version.
 // schema.sql always represents the LATEST full schema (for fresh DBs).
@@ -95,6 +95,7 @@ BEGIN
 END;`
 
 var migrations = map[int]string{
+	61: sqliteOrcaServersMigration,
 	60: sqliteSecureCLICredentialLabelsMigration,
 	// Version 59 → 60: keep an append-only copy of group capture. Pending rows are
 	// deleted when the buffer is handed to the agent and when compaction replaces

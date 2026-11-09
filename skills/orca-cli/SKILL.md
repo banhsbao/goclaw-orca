@@ -55,7 +55,7 @@ agent sandbox, against either the local Orca runtime or a paired remote one.
   `environment`, `account` (except `account list`), `computer`, `diagnostics`,
   `skills install|update|share`, and `orchestration reset` are blocked.
 - If `orca` is missing, or `status` reports a missing credential or an unreachable runtime,
-  tell the user what to set up (CLI in the image, `orca` credential, sandbox network access
+  tell the user what to set up (CLI in the image, `orca` credential or an entry on the Orca Servers page, sandbox network access
   to the Orca server) instead of retrying.
 - `orca` is not on the exec safe-bin list, so exec approval (`on-miss`) may ask the user
   to approve the first call.
@@ -215,9 +215,13 @@ orca terminal send --terminal <handle> --text "<follow-up brief>" --enter --wait
 ```
 
 - In a chat turn the no-blocking rule above applies. In a team task run you must collect
-  evidence before completing the task, so wait once with
-  `orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 600000 --json`, then
-  read once with `--screen`. Never poll with repeated `terminal read`.
+  evidence before completing the task, so wait for the agent to go idle, then read once with
+  `--screen`. Never poll with repeated `terminal read`.
+- Every `exec` call is killed at the exec timeout (60 seconds by default), and a killed
+  `wait` comes back as a failed call that teaches nothing. Keep each wait under it:
+  `orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 50000 --json`.
+  When it returns `timeout`, run the same wait again, up to 12 times (about 10 minutes),
+  then read the screen once and report what you see.
 
 ## Async Handoff Follow-up
 
@@ -260,8 +264,8 @@ through a `cron` job instead of waiting.
 orca terminal read --terminal <handle> --json            # accumulated output
 orca terminal read --terminal <handle> --screen --json   # what is on screen now (TUIs, progress bars)
 orca terminal send --terminal <handle> --text "continue" --enter --json
-orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 300000 --json
-orca terminal wait --terminal <handle> --for exit --timeout-ms 60000 --json
+orca terminal wait --terminal <handle> --for tui-idle --timeout-ms 50000 --json
+orca terminal wait --terminal <handle> --for exit --timeout-ms 50000 --json
 orca terminal create --worktree <selector> --title "Tests" --command "pnpm test" --json
 orca terminal split --terminal <handle> --direction vertical --command "pnpm dev" --json
 orca terminal close --terminal <handle> --json
@@ -271,8 +275,10 @@ orca terminal close --terminal <handle> --json
 - `accepted: true` on a send means input was accepted, not that the agent started a turn.
   Pass `--wait-submit <seconds>` when you need proof. Never resend just because output is quiet.
 - Always pass `--timeout-ms` to `wait`. Use `tui-idle` for agent CLIs and `exit` for commands.
-- A `wait` that returns `timeout` means the work is still running, not that it failed. Do
-  not wait again in a loop. Read the screen once, then report progress or schedule a check.
+- A `wait` that returns `timeout` means the work is still running, not that it failed. In a
+  chat turn do not wait again in a loop: read the screen once, then report progress or
+  schedule a check. In a team task run follow the bounded wait rule above.
+- Never pass a `--timeout-ms` longer than the exec timeout (keep it at 50000 or less).
 - For long output, page with `--cursor <nextCursor> --limit 1000` while `limited` is true.
 - If a send is refused with `agent_prompt_blocked`, the agent is showing a permission menu:
   report it to the user rather than answering the menu yourself.

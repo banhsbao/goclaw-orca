@@ -167,6 +167,7 @@ func NewManagedResolver(deps ResolverDeps) ResolverFunc {
 		}
 
 		// Resolve provider (tenant-aware: tries tenant-specific first, falls back to master)
+		model := ag.Model
 		provider, err := providerresolve.ResolveAgentProvider(deps.ProviderReg, ag)
 		if err != nil {
 			// Fallback to any available provider for this tenant
@@ -175,8 +176,11 @@ func NewManagedResolver(deps ResolverDeps) ResolverFunc {
 				return nil, fmt.Errorf("no providers configured for agent %s", agentKey)
 			}
 			provider, _ = deps.ProviderReg.GetForTenant(ag.TenantID, names[0])
+			if provider != nil && provider.DefaultModel() != "" {
+				model = provider.DefaultModel()
+			}
 			slog.Warn("agent provider not found, using fallback",
-				"agent", agentKey, "wanted", ag.Provider, "using", names[0])
+				"agent", agentKey, "wanted", ag.Provider, "using", names[0], "model", model)
 			if rc := ag.ParseReasoningConfig(); rc.Effort != "" && rc.Effort != "off" {
 				slog.Warn("agent thinking may not be supported by fallback provider",
 					"agent", agentKey, "thinking_level", rc.Effort,
@@ -481,7 +485,7 @@ func NewManagedResolver(deps ResolverDeps) ResolverFunc {
 			IsTeamLead:             isTeamLead,
 			AutoInjector:           deps.AutoInjector,
 			Provider:               provider,
-			Model:                  ag.Model,
+			Model:                  model,
 			ModelRegistry:          deps.ModelRegistry,
 			ContextWindow:          contextWindow,
 			MaxTokens:              ag.ParseMaxTokens(),
